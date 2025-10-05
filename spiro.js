@@ -36,7 +36,9 @@ function windowResized() {
 function resetSpirographs() {
   spirographs = [];
   theta = 0;
-  background(290, 80, 10);
+  // FIX: Use the current theme's baseHue for a full, opaque background wipe (no trail alpha)
+  const bgHue = params.baseHue !== undefined ? params.baseHue : 290;
+  background(bgHue, 80, 10);
 }
 
 // =================================================================
