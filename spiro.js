@@ -6,6 +6,7 @@ let canvasEl = null;
 let themeTransition = null;
 
 // The definitive list of parameters that can be smoothly transitioned without a hard reset.
+// Scale is included because the draw loop scales ALL existing points in the trail, making a smooth zoom possible.
 const AESTHETIC_PARAMS = ['animSpeed', 'trailLength', 'lineWeight', 'lineThinning', 'baseHue', 'colorSpread', 'scale']; 
 
 function getCanvasSize() {
@@ -36,17 +37,13 @@ function windowResized() {
 function resetSpirographs() {
   spirographs = [];
   theta = 0;
-  // FIX: Use the current theme's baseHue for a full, opaque background wipe (no trail alpha)
+  // FIX: Use the current theme's baseHue for a full, opaque background wipe
   const bgHue = params.baseHue !== undefined ? params.baseHue : 290;
   background(bgHue, 80, 10);
 }
 
 // =================================================================
 // PRIMARY DRAW LOOP LOGIC
-// =================================================================
-
-// =================================================================
-// PRIMARY DRAW LOOP LOGIC (Updated)
 // =================================================================
 
 function draw() {
@@ -148,18 +145,15 @@ function updateAllParams() {
   params.lineThinning = parseFloat(document.getElementById('lineThinning').value);
   params.baseHue = parseFloat(document.getElementById('baseHue').value);
   params.colorSpread = parseFloat(document.getElementById('colorSpread').value);
+
+  // Flash property is managed internally but needs a default value
+  params.flash = params.flash !== undefined ? params.flash : 0;
 }
 
 function shuffleTheme() {
   if (!Array.isArray(window.themes) || window.themes.length === 0) return;
 
-  // Correctly use window.them// =================================================================
-// PARAMETER/THEME LOGIC (Updated)
-// =================================================================
-
-function shuffleTheme() {
-  if (!Array.isArray(window.themes) || window.themes.length === 0) return;
-
+  // Correctly use window.themes
   const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
 
   // 1. HARD CLEAR: Immediately wipe the screen using the new base hue.
@@ -201,6 +195,7 @@ function shuffleTheme() {
     duration: 250 // The flash fades out over 250ms
   };
 }
+
 // =================================================================
 // GEOMETRY MATH (Spirographs)
 // =================================================================
@@ -400,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
   
   // =================================================================
-  // MODIFIED SLIDER EVENT LISTENER
+  // MODIFIED SLIDER EVENT LISTENER (Handles Smooth/Hard Resets)
   // =================================================================
   document.querySelectorAll("input[type=range]").forEach(input => {
     const display = document.getElementById(input.id + "-value");
