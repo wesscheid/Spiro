@@ -5,7 +5,7 @@ let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
 
-// Parameters that change motion/aesthetics and should be smoothly transitioned
+// The definitive list of parameters that can be smoothly transitioned without a hard reset.
 const AESTHETIC_PARAMS = ['animSpeed', 'trailLength', 'lineWeight', 'lineThinning', 'baseHue', 'colorSpread', 'scale']; 
 
 function getCanvasSize() {
@@ -102,7 +102,6 @@ function startParameterTransition(paramName, newValue, duration = 300) {
 
 function updateAllParams() {
   // Reads ALL parameter values from the DOM and updates the 'params' object
-  // This is only called when a hard reset (geometry change) is needed, or on setup.
   
   // Primary Curve
   params.curveType = document.getElementById('curveType').value;
@@ -130,13 +129,12 @@ function updateAllParams() {
   params.lineThinning = parseFloat(document.getElementById('lineThinning').value);
   params.baseHue = parseFloat(document.getElementById('baseHue').value);
   params.colorSpread = parseFloat(document.getElementById('colorSpread').value);
-
-  // Re-generate spirograph objects only if necessary (usually handled by shuffle/reset)
 }
 
 function shuffleTheme() {
   if (!Array.isArray(window.themes) || window.themes.length === 0) return;
 
+  // Correctly use window.themes
   const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
 
   // The duration is set here (250ms)
