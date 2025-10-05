@@ -212,7 +212,7 @@ function shuffleTheme() {
       colorSpread: choice.spread ?? 120
     },
     start: millis(),
-    duration: 250
+    duration: 1000
   };
 }
 
