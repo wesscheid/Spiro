@@ -45,6 +45,10 @@ function resetSpirographs() {
 // PRIMARY DRAW LOOP LOGIC
 // =================================================================
 
+// =================================================================
+// PRIMARY DRAW LOOP LOGIC (Updated)
+// =================================================================
+
 function draw() {
   if (!params || Object.keys(params).length === 0) return;
 
@@ -78,6 +82,19 @@ function draw() {
   
   // Recalculate and draw the current frame
   drawSpirograph();
+
+  // 3. Handle Flash Effect during Shuffle (New Logic)
+  // This draws a white rectangle over the screen, fading out from 100% to 0%.
+  if (params.flash > 0) {
+    push(); // Save current drawing state
+    translate(width / 2, height / 2); // Center the drawing mode
+    noStroke();
+    // Fill with white (0, 0, 100) and use params.flash for alpha (0-100)
+    fill(0, 0, 100, params.flash); 
+    rectMode(CENTER);
+    rect(0, 0, width, height);
+    pop(); // Restore drawing state
+  }
 }
 
 // =================================================================
@@ -136,12 +153,27 @@ function updateAllParams() {
 function shuffleTheme() {
   if (!Array.isArray(window.themes) || window.themes.length === 0) return;
 
-  // Correctly use window.themes
+  // Correctly use window.them// =================================================================
+// PARAMETER/THEME LOGIC (Updated)
+// =================================================================
+
+function shuffleTheme() {
+  if (!Array.isArray(window.themes) || window.themes.length === 0) return;
+
   const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
 
-  // The duration is set here (250ms)
+  // 1. HARD CLEAR: Immediately wipe the screen using the new base hue.
+  // This removes any lingering ghost images before the transition.
+  const newHue = choice.hue ?? 260; 
+  background(newHue, 80, 10);
+  
+  // 2. INITIATE TRANSITION
   themeTransition = {
-    from: { ...params },
+    from: { 
+      ...params,
+      // Flash starts fully opaque (100)
+      flash: 100 
+    },
     to: {
       curveType: choice.curveType || "hypotrochoid",
       dualCurveMode: !!choice.dual,
@@ -161,13 +193,14 @@ function shuffleTheme() {
       lineWeight: choice.lineWeight ?? 1.6,
       lineThinning: choice.lineThinning ?? 0.7,
       baseHue: choice.hue ?? 260,
-      colorSpread: choice.spread ?? 120
+      colorSpread: choice.spread ?? 120,
+      // Flash ends fully transparent (0)
+      flash: 0 
     },
     start: millis(),
-    duration: 250
+    duration: 250 // The flash fades out over 250ms
   };
 }
-
 // =================================================================
 // GEOMETRY MATH (Spirographs)
 // =================================================================
