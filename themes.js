@@ -1,5 +1,3 @@
-// CORRECTED Spiro-main.zip/Spiro-main/themes.js
-
 window.themes = [
     { name: "Petal Bloom", curveType: "rose", outer: 150, inner: 40, center: 120, points: 8, hue: 300, spread: 60, speed: 0.015, layers: 2, offset: "radius", reverse: false, dual: false },
     { name: "Infinity Weave", curveType: "lissajous", outer: 220, inner: 180, center: 80, points: 6, hue: 200, spread: 120, speed: 0.01, layers: 3, offset: "phase", reverse: true, dual: true, secondary: "hypotrochoid", dualMode: "combine" },
