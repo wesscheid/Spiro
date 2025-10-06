@@ -147,7 +147,7 @@ function updateAllParams() {
   params.colorSpread = parseFloat(document.getElementById('colorSpread').value);
 
   // Flash property is managed internally but needs a default value
-  params.flash = params.flash !== undefined ? params.flash : 0;
+  params.flash = 0;
 }
 
 function shuffleTheme() {
