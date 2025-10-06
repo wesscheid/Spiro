@@ -162,7 +162,7 @@ function shuffleTheme() {
   // Correctly use window.themes
   const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
 
-  // 1. HARD RESET CORE LOGIC (THE FIX)
+  // 1. HARD RESET CORE LOGIC
   // These lines clear the old, incompatible trail data and reset the drawing phase.
   spirographs = []; 
   theta = 0;
@@ -172,12 +172,12 @@ function shuffleTheme() {
   const newHue = choice.hue ?? 260; 
   background(newHue, 80, 10);
   
-  // 3. INITIATE TRANSITION (Flash)
+  // 3. INITIATE TRANSITION (Softened Flash)
   themeTransition = {
     from: { 
       ...params,
-      // Flash starts fully opaque (100)
-      flash: 100 
+      // FIX: Flash starts at 70% opacity (less intense)
+      flash: 70 
     },
     to: {
       curveType: choice.curveType || "hypotrochoid",
@@ -206,6 +206,7 @@ function shuffleTheme() {
     duration: 250 // The flash fades out over 250ms
   };
 }
+
 
 // =================================================================
 // GEOMETRY MATH (Spirographs)
