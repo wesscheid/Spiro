@@ -156,12 +156,17 @@ function shuffleTheme() {
   // Correctly use window.themes
   const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
 
-  // 1. HARD CLEAR: Immediately wipe the screen using the new base hue.
+  // 1. HARD RESET CORE LOGIC (THE FIX)
+  // These lines clear the old, incompatible trail data and reset the drawing phase.
+  spirographs = []; 
+  theta = 0;
+  
+  // 2. HARD CLEAR: Immediately wipe the screen using the new base hue.
   // This removes any lingering ghost images before the transition.
   const newHue = choice.hue ?? 260; 
   background(newHue, 80, 10);
   
-  // 2. INITIATE TRANSITION
+  // 3. INITIATE TRANSITION (Flash)
   themeTransition = {
     from: { 
       ...params,
