@@ -43,7 +43,11 @@ function resetSpirographs() {
 }
 
 // =================================================================
-// PRIMARY DRAW LOOP LOGIC
+// PRIMARY  LOOP LOGIC
+// =================================================================
+
+// =================================================================
+// PRIMARY DRAW LOOP LOGIC (Updated)
 // =================================================================
 
 function draw() {
@@ -80,20 +84,22 @@ function draw() {
   // Recalculate and draw the current frame
   drawSpirograph();
 
-  // 3. Handle Flash Effect during Shuffle (New Logic)
-  // This draws a white rectangle over the screen, fading out from 100% to 0%.
+  // 3. Handle Flash Effect during Shuffle (FIXED LOGIC)
   if (params.flash > 0) {
-    push(); // Save current drawing state
-    translate(width / 2, height / 2); // Center the drawing mode
+    // We are already inside the drawing space translated to the center (width/2, height/2)
+    push(); // Save the current state (translated to center)
+
     noStroke();
     // Fill with white (0, 0, 100) and use params.flash for alpha (0-100)
     fill(0, 0, 100, params.flash); 
+    
+    // Draw the rectangle centered at (0, 0) of the *translated* coordinate system
     rectMode(CENTER);
-    rect(0, 0, width, height);
-    pop(); // Restore drawing state
+    rect(0, 0, width, height); 
+    
+    pop(); // Restore previous drawing state
   }
 }
-
 // =================================================================
 // PARAMETER/THEME LOGIC
 // =================================================================
