@@ -181,7 +181,7 @@ function shuffleTheme() {
   
   params.layerOffsetMode = choice.offset || "radius";
   params.layerOffsetAmount = choice.offsetAmount ?? 0.06;
-  params.reverseLayers = !!choice.reverse; // THIS SNAPS IMMEDIATELY
+  params.reverseLayers = !!choice.reverse;
   
   // 3. HARD CLEAR & BASE HUE SNAP
   // Apply the new background hue (and base color) immediately.
@@ -343,8 +343,9 @@ function drawSpirograph() {
   for (let i = 0; i < params.numLayers; i++) {
     const layer = spirographs[i];
     
-    // Choose drawing mode for dual curves
-    if (params.dualCurveMode && params.dualModeType === "combine" && i > 0) continue; 
+    // FIX: Removed the incorrect layer-skipping logic.
+    // The previous line 'if (params.dualCurveMode && params.dualModeType === "combine" && i > 0) continue;'
+    // incorrectly prevented all layers after the first (i=0) from drawing when Dual Curve Mode was active.
     
     // Use beginShape/endShape for continuous line drawing
     beginShape();
