@@ -241,7 +241,13 @@ function getPolarCoordinate(theta, layer) {
       }
   }
 
-  const currentTheta = theta + tOffset * (params.reverseLayers ? -1 : 1);
+  // >>> FIX: Implement layer alternation for rotation/phase offset direction <<<
+  let rotationFactor = 1;
+  if (params.reverseLayers) {
+      // If 'Reverse Alternate Layers' is checked, alternate direction for the offset
+      rotationFactor = (layer % 2 === 0) ? 1 : -1;
+  }
+  const currentTheta = theta + tOffset * rotationFactor;
 
   let x, y, r;
 
@@ -343,18 +349,21 @@ function drawSpirograph() {
   for (let i = 0; i < params.numLayers; i++) {
     const layer = spirographs[i];
     
-    // FIX: Removed the incorrect layer-skipping logic.
-    // The previous line 'if (params.dualCurveMode && params.dualModeType === "combine" && i > 0) continue;'
-    // incorrectly prevented all layers after the first (i=0) from drawing when Dual Curve Mode was active.
-    
     // Use beginShape/endShape for continuous line drawing
     beginShape();
     for (let j = 0; j < layer.length; j++) {
       const p = layer[j];
       const t = j / layer.length; // Normalized position along the trail
 
+      // >>> FIX: Implement layer alternation for color spread direction <<<
+      let colorFactor = 1;
+      if (params.reverseLayers) {
+          // If 'Reverse Alternate Layers' is checked, alternate direction for the color spread
+          colorFactor = (i % 2 === 0) ? 1 : -1;
+      }
+      
       // Calculate hue and alpha
-      const hue = (params.baseHue + (t * params.colorSpread * (params.reverseLayers ? -1 : 1)) + (i * 360 / params.numLayers)) % 360;
+      const hue = (params.baseHue + (t * params.colorSpread * colorFactor) + (i * 360 / params.numLayers)) % 360;
       const alpha = map(t, 0, 1, 30, 100);
 
       // Calculate weight with thinning effect
