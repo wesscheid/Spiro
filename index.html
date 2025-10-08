@@ -94,8 +94,7 @@
     <div class="control-group">
       <label for="layerOffsetMode">Layer Offset Mode</label>
       <select id="layerOffsetMode">
-        <option value="none">None</option>
-        <option value="radius">Radius</option>
+        <option value="radius" selected>Radius</option>
         <option value="rotation">Rotation</option>
         <option value="phase">Phase</option>
       </select>
@@ -148,83 +147,5 @@
 
   <div id="canvas-container">
     </div>
-</body>
-</html>    <div class="control-group">
-      <label for="innerRadius">Inner Radius <span id="innerRadius-value" class="value-display"></span></label>
-      <input id="innerRadius" type="range" min="5" max="300" value="80" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="centerSize">Center Size <span id="centerSize-value" class="value-display"></span></label>
-      <input id="centerSize" type="range" min="0" max="300" value="60" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="numPoints">Points <span id="numPoints-value" class="value-display"></span></label>
-      <input id="numPoints" type="range" min="1" max="64" value="12" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="scale">Scale <span id="scale-value" class="value-display"></span></label>
-      <input id="scale" type="range" min="0.1" max="2" value="1" step="0.01">
-    </div>
-
-    <div class="control-group">
-      <label for="numLayers">Layers <span id="numLayers-value" class="value-display"></span></label>
-      <input id="numLayers" type="range" min="1" max="8" value="2" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="layerOffsetMode">Layer Offset Mode</label>
-      <select id="layerOffsetMode">
-        <option value="radius">Radius</option>
-        <option value="rotation">Rotation</option>
-        <option value="phase">Phase</option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label for="layerOffsetAmount">Layer Offset Amount <span id="layerOffsetAmount-value" class="value-display"></span></label>
-      <input id="layerOffsetAmount" type="range" min="0" max="1" step="0.01" value="0.06">
-    </div>
-
-    <div class="control-group">
-      <label>
-        <input type="checkbox" id="reverseLayers"> Reverse Alternate Layers
-      </label>
-    </div>
-
-    <div class="control-group">
-      <label for="animSpeed">Anim Speed <span id="animSpeed-value" class="value-display"></span></label>
-      <input id="animSpeed" type="range" min="0" max="0.04" step="0.001" value="0.02">
-    </div>
-
-    <div class="control-group">
-      <label for="trailLength">Trail Length <span id="trailLength-value" class="value-display"></span></label>
-      <input id="trailLength" type="range" min="10" max="400" step="1" value="50">
-    </div>
-
-    <div class="control-group">
-      <label for="lineWeight">Line Weight <span id="lineWeight-value" class="value-display"></span></label>
-      <input id="lineWeight" type="range" min="0.1" max="6" step="0.1" value="1.6">
-    </div>
-
-    <div class="control-group">
-      <label for="lineThinning">Line Thinning <span id="lineThinning-value" class="value-display"></span></label>
-      <input id="lineThinning" type="range" min="0" max="1" step="0.01" value="0.7">
-    </div>
-
-    <div class="control-group">
-      <label for="baseHue">Base Hue <span id="baseHue-value" class="value-display"></span></label>
-      <input id="baseHue" type="range" min="0" max="360" step="1" value="260">
-    </div>
-
-    <div class="control-group">
-      <label for="colorSpread">Color Spread <span id="colorSpread-value" class="value-display"></span></label>
-      <input id="colorSpread" type="range" min="0" max="360" step="1" value="120">
-    </div>
-  </div>
-
-  <div id="canvas-container"></div>
 </body>
 </html>
