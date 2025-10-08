@@ -181,7 +181,7 @@ function shuffleTheme() {
   
   params.layerOffsetMode = choice.offset || "radius";
   params.layerOffsetAmount = choice.offsetAmount ?? 0.06;
-  params.reverseLayers = !!choice.reverse;
+  params.reverseLayers = !!choice.reverse; // THIS SNAPS IMMEDIATELY
   
   // 3. HARD CLEAR & BASE HUE SNAP
   // Apply the new background hue (and base color) immediately.
