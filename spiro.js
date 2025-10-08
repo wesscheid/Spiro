@@ -241,12 +241,17 @@ function getPolarCoordinate(theta, layer) {
       }
   }
 
-  // >>> THE NEW, CORRECT FIX: Apply the directional reversal to the base theta <<<
+  // Directional Factor logic (Applies to the time-based angle, theta)
   let directionalFactor = 1;
   if (params.reverseLayers) {
       // If 'Reverse Alternate Layers' is checked, alternate the base angle's sign
       // for odd layers to make them trace the curve in the opposite direction.
       directionalFactor = (layer % 2 === 0) ? 1 : -1;
+  }
+  
+  // FIX for Reverse Alternate Layers: Reverse rotational offset for reversed layers
+  if (directionalFactor === -1 && (params.layerOffsetMode === "rotation" || params.layerOffsetMode === "phase")) {
+    tOffset *= -1;
   }
   
   // Apply the directional factor to the base angle (theta) and add the static layer offset (tOffset)
@@ -263,6 +268,7 @@ function getPolarCoordinate(theta, layer) {
         const sign = curveType === "hypotrochoid" ? -1 : 1;
         const k = R / r_;
         
+        // currentTheta already includes the directionalFactor and offset
         x = (R + sign * r_) * cos(currentTheta) - d * sign * cos(k * currentTheta + currentTheta);
         y = (R + sign * r_) * sin(currentTheta) - d * sign * sin(k * currentTheta + currentTheta);
         break;
@@ -282,6 +288,7 @@ function getPolarCoordinate(theta, layer) {
         const ampY = params.innerRadius;
         const phase = params.layerOffsetAmount * PI; // Use offset for phase
         
+        // currentTheta already includes the directionalFactor and offset
         x = ampX * sin(freqX * currentTheta + phase);
         y = ampY * cos(freqY * currentTheta);
         break;
@@ -289,7 +296,10 @@ function getPolarCoordinate(theta, layer) {
     case "superformula":
         // Simplified Superformula
         const m = params.numPoints;
-        const n1 = 0.5; 
+        
+        // FIX: Increased n1 from 0.5 to 1.0 to prevent the radius from collapsing to near zero 
+        const n1 = 1.0; 
+        
         const n2 = 1.7;
         const n3 = 1.7;
         const a = 1;
@@ -311,6 +321,7 @@ function getPolarCoordinate(theta, layer) {
         const phase2 = params.layerOffsetAmount * HALF_PI;
         const damp = 0.9999;
         
+        // currentTheta already includes the directionalFactor and offset
         x = (params.outerRadius + rOffset) * cos(freq1 * currentTheta + phase1) * (damp ** currentTheta);
         y = (params.innerRadius) * sin(freq2 * currentTheta + phase2) * (damp ** currentTheta);
         break;
@@ -358,7 +369,7 @@ function drawSpirograph() {
       const p = layer[j];
       const t = j / layer.length; // Normalized position along the trail
 
-      // This logic is for color spreading and is retained from the previous fix.
+      // This logic ensures the color trail also flows in the reversed direction
       let colorFactor = 1;
       if (params.reverseLayers) {
           // If 'Reverse Alternate Layers' is checked, alternate direction for the color spread
