@@ -241,13 +241,16 @@ function getPolarCoordinate(theta, layer) {
       }
   }
 
-  // >>> FIX: Implement layer alternation for rotation/phase offset direction <<<
-  let rotationFactor = 1;
+  // >>> THE NEW, CORRECT FIX: Apply the directional reversal to the base theta <<<
+  let directionalFactor = 1;
   if (params.reverseLayers) {
-      // If 'Reverse Alternate Layers' is checked, alternate direction for the offset
-      rotationFactor = (layer % 2 === 0) ? 1 : -1;
+      // If 'Reverse Alternate Layers' is checked, alternate the base angle's sign
+      // for odd layers to make them trace the curve in the opposite direction.
+      directionalFactor = (layer % 2 === 0) ? 1 : -1;
   }
-  const currentTheta = theta + tOffset * rotationFactor;
+  
+  // Apply the directional factor to the base angle (theta) and add the static layer offset (tOffset)
+  const currentTheta = (theta * directionalFactor) + tOffset;
 
   let x, y, r;
 
@@ -355,7 +358,7 @@ function drawSpirograph() {
       const p = layer[j];
       const t = j / layer.length; // Normalized position along the trail
 
-      // >>> FIX: Implement layer alternation for color spread direction <<<
+      // This logic is for color spreading and is retained from the previous fix.
       let colorFactor = 1;
       if (params.reverseLayers) {
           // If 'Reverse Alternate Layers' is checked, alternate direction for the color spread
