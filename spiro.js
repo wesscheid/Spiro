@@ -245,7 +245,6 @@ function getPolarCoordinate(theta, layer) {
   let directionalFactor = 1;
   if (params.reverseLayers) {
       // If 'Reverse Alternate Layers' is checked, alternate the base angle's sign
-      // for odd layers to make them trace the curve in the opposite direction.
       directionalFactor = (layer % 2 === 0) ? 1 : -1;
   }
   
@@ -262,10 +261,25 @@ function getPolarCoordinate(theta, layer) {
   switch (curveType) {
     case "hypotrochoid":
     case "epitrochoid":
-        const R = params.outerRadius + rOffset;
-        const r_ = params.innerRadius;
+        const R_base = params.outerRadius + rOffset;
         const d = params.centerSize;
         const sign = curveType === "hypotrochoid" ? -1 : 1;
+        
+        let R = R_base;
+        let r_ = params.innerRadius; // Start with the user's base innerRadius
+
+        // FIX: Inject numPoints (N) to override the R/r_ ratio and force a clean N-point shape.
+        const N = max(1, params.numPoints);
+        if (N > 1) {
+            if (curveType === "hypotrochoid") {
+                // To generate a clean N-lobe pattern, set R : r_ = N : (N - 1)
+                r_ = R_base * ((N - 1) / N);
+            } else { // epitrochoid
+                // To generate a clean N-lobe pattern, set R : r_ = N : (N + 1)
+                r_ = R_base * ((N + 1) / N);
+            }
+        } 
+        
         const k = R / r_;
         
         // currentTheta already includes the directionalFactor and offset
@@ -297,11 +311,11 @@ function getPolarCoordinate(theta, layer) {
         // Simplified Superformula
         const m = params.numPoints;
         
-        // FIX: Increased n1 from 0.5 to 1.0 to prevent the radius from collapsing to near zero 
+        // FIX: Set n1, n2, and n3 to 1.0 to prevent the radius from collapsing when m (numPoints) is large
         const n1 = 1.0; 
+        const n2 = 1.0; 
+        const n3 = 1.0; 
         
-        const n2 = 1.7;
-        const n3 = 1.7;
         const a = 1;
         const b = 1;
         
