@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spirograph Studio - Enhanced</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0f, #1a1a2e);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .controls {
+            width: 280px;
+            background: rgba(6, 10, 28, 0.85);
+            backdrop-filter: blur(15px);
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, #182a69, #000005);
+            position: relative;
+        }
+
+        #spirograph-canvas {
+            border-radius: 12px !important;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.2) !important;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            font-size: 20px;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #e0e0e0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .slider-container {
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #2a2a3a, #4a4a5a);
+            outline: none;
+            opacity: 0.9;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]:hover {
+            opacity: 1;
+            background: linear-gradient(90deg, #3a3a4a, #5a5a6a);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+        }
+
+        .value-display {
+            position: absolute;
+            right: 0;
+            top: -22px;
+            font-size: 11px;
+            color: #00d4ff;
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 35px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #00d4ff, #0088cc);
+            color: white;
+            font-weight: 600;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 12px rgba(0, 212, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 16px rgba(0, 212, 255, 0.4);
+        }
+
+        .shuffle-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee4444);
+            box-shadow: 0 3px 12px rgba(255, 107, 107, 0.3);
+        }
+
+        .shuffle-btn:hover {
+            box-shadow: 0 5px 16px rgba(255, 107, 107, 0.4);
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .controls {
+                width: 100%;
+                height: 280px;
+                order: 2;
+                padding: 15px;
+            }
+            
+            .canvas-container {
+                order: 1;
+                min-height: calc(100vh - 280px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <h1>Spirograph Studio</h1>
+            
+            <div class="button-group">
+                <button class="shuffle-btn" onclick="shuffleParameters()">🎲 Shuffle</button>
+                <button onclick="saveCanvas()">💾 Save</button>
+            </div>
+
+            <div class="control-group">
+                <label>Outside Radius</label>
+                <div class="slider-container">
+                    <input type="range" id="outerRadius" min="50" max="250" value="120" oninput="updateValue(this)">
+                    <span class="value-display" id="outerRadius-value">120</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Inside Radius</label>
+                <div class="slider-container">
+                    <input type="range" id="innerRadius" min="5" max="120" value="50" oninput="updateValue(this)">
+                    <span class="value-display" id="innerRadius-value">50</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Number of Points</label>
+                <div class="slider-container">
+                    <input type="range" id="numPoints" min="1" max="12" value="3" oninput="updateValue(this)">
+                    <span class="value-display" id="numPoints-value">3</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Center Size</label>
+                <div class="slider-container">
+                    <input type="range" id="centerSize" min="5" max="100" value="40" oninput="updateValue(this)">
+                    <span class="value-display" id="centerSize-value">40</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Trail Length</label>
+                <div class="slider-container">
+                    <input type="range" id="trailLength" min="20" max="500" value="200" oninput="updateValue(this)">
+                    <span class="value-display" id="trailLength-value">200</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Line Weight</label>
+                <div class="slider-container">
+                    <input type="range" id="lineWeight" min="0.5" max="8" step="0.1" value="2" oninput="updateValue(this)">
+                    <span class="value-display" id="lineWeight-value">2</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Line Thinning</label>
+                <div class="slider-container">
+                    <input type="range" id="lineThinning" min="0" max="1" step="0.05" value="0.3" oninput="updateValue(this)">
+                    <span class="value-display" id="lineThinning-value">0.3</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Animation Speed</label>
+                <div class="slider-container">
+                    <input type="range" id="animSpeed" min="0.001" max="0.1" step="0.001" value="0.01" oninput="updateValue(this)">
+                    <span class="value-display" id="animSpeed-value">0.01</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Scale</label>
+                <div class="slider-container">
+                    <input type="range" id="scale" min="0.3" max="2.5" step="0.1" value="1" oninput="updateValue(this)">
+                    <span class="value-display" id="scale-value">1</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Color Spread</label>
+                <div class="slider-container">
+                    <input type="range" id="colorSpread" min="0" max="360" value="120" oninput="updateValue(this)">
+                    <span class="value-display" id="colorSpread-value">120</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Rotation</label>
+                <div class="slider-container">
+                    <input type="range" id="rotation" min="0" max="360" value="0" oninput="updateValue(this)">
+                    <span class="value-display" id="rotation-value">0</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Eccentricity</label>
+                <div class="slider-container">
+                    <input type="range" id="eccentricity" min="0" max="2" step="0.05" value="0" oninput="updateValue(this)">
+                    <span class="value-display" id="eccentricity-value">0</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Phase Offset</label>
+                <div class="slider-container">
+                    <input type="range" id="phaseOffset" min="0" max="6.28" step="0.1" value="0" oninput="updateValue(this)">
+                    <span class="value-display" id="phaseOffset-value">0</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Base Color</label>
+                <input type="color" id="baseColor" value="#00d4ff" onchange="updateColor()">
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvas-container">
+        </div>
+    </div>
+
+    <script>
+        let spirographs = [];
+        let theta = 0;
+        let params = {};
+        
+        function setup() {
+            let canvas = createCanvas(1080, 1080);
+            canvas.parent('canvas-container');
+            canvas.id('spirograph-canvas');
+            colorMode(HSB, 360, 100, 100, 100);
+            
+            // Initialize parameters
+            updateAllParams();
+            
+            // Initialize spirograph paths
+            resetSpirographs();
+        }
+        
+        function draw() {
+            // Clear with subtle fade for trails
+            fill(0, 0, 0, 100 - params.trailLength / 20);
+            noStroke();
+            rect(0, 0, width, height);
+            
+            // Center the drawing
+            push();
+            translate(width / 2, height / 2);
+            scale(params.scale);
+            
+            // Draw each spirograph curve
+            for (let i = 0; i < params.numPoints; i++) {
+                drawSpirographCurve(i);
+            }
+            
+            pop();
+            
+            // Advance animation
+            theta += params.animSpeed;
+        }
+        
+        function drawSpirographCurve(index) {
+            // Each point gets its own slight parameter variation for separate curves
+            let outerRadiusVariation = params.outerRadius + (index * 10);
+            let innerRadiusVariation = params.innerRadius + (index * 3);
+            let centerSizeVariation = params.centerSize + (index * 2);
+            
+            // Distribute starting positions evenly around a circle
+            let startingAngle = (index * TWO_PI) / params.numPoints;
+            let currentTheta = theta + startingAngle + params.phaseOffset;
+            
+            // Apply eccentricity (elliptical deformation)
+            let eccentricityX = 1 + params.eccentricity * 0.5;
+            let eccentricityY = 1 - params.eccentricity * 0.5;
+            
+            // Each point traces its own unique spirograph curve
+            let x = (outerRadiusVariation - innerRadiusVariation) * cos(currentTheta) + 
+                    centerSizeVariation * cos((outerRadiusVariation - innerRadiusVariation) / innerRadiusVariation * currentTheta);
+            let y = (outerRadiusVariation - innerRadiusVariation) * sin(currentTheta) - 
+                    centerSizeVariation * sin((outerRadiusVariation - innerRadiusVariation) / innerRadiusVariation * currentTheta);
+            
+            // Apply eccentricity
+            x *= eccentricityX;
+            y *= eccentricityY;
+            
+            // Apply rotation
+            if (params.rotation !== 0) {
+                let rotRad = radians(params.rotation);
+                let rotatedX = x * cos(rotRad) - y * sin(rotRad);
+                let rotatedY = x * sin(rotRad) + y * cos(rotRad);
+                x = rotatedX;
+                y = rotatedY;
+            }
+            
+            // Add point to path
+            if (!spirographs[index]) {
+                spirographs[index] = [];
+            }
+            
+            spirographs[index].push({x: x, y: y});
+            
+            // Limit path length
+            if (spirographs[index].length > params.trailLength) {
+                spirographs[index].shift();
+            }
+            
+            // Draw smooth curve with line thinning
+            if (spirographs[index].length > 2) {
+                let hue = (params.baseHue + (index * params.colorSpread / params.numPoints)) % 360;
+                strokeCap(ROUND);
+                strokeJoin(ROUND);
+                noFill();
+                
+                // Draw curve with varying thickness
+                for (let j = 1; j < spirographs[index].length; j++) {
+                    let prevPoint = spirographs[index][j-1];
+                    let currentPoint = spirographs[index][j];
+                    
+                    // Calculate thickness based on position in trail (thinning effect)
+                    let trailPosition = j / spirographs[index].length;
+                    let thicknessFactor = 1 - (1 - trailPosition) * params.lineThinning;
+                    let currentThickness = params.lineWeight * thicknessFactor;
+                    
+                    stroke(hue, 70, 90, 80);
+                    strokeWeight(currentThickness);
+                    line(prevPoint.x, prevPoint.y, currentPoint.x, currentPoint.y);
+                }
+                
+                // Draw current position indicator
+                fill(hue, 80, 100, 90);
+                noStroke();
+                circle(x, y, params.lineWeight * 2);
+                
+                // Bright center
+                fill(0, 0, 100, 100);
+                circle(x, y, params.lineWeight * 0.8);
+            }
+        }
+        
+        function updateAllParams() {
+            params.outerRadius = parseFloat(document.getElementById('outerRadius').value);
+            params.innerRadius = parseFloat(document.getElementById('innerRadius').value);
+            params.numPoints = parseInt(document.getElementById('numPoints').value);
+            params.centerSize = parseFloat(document.getElementById('centerSize').value);
+            params.trailLength = parseFloat(document.getElementById('trailLength').value);
+            params.lineWeight = parseFloat(document.getElementById('lineWeight').value);
+            params.lineThinning = parseFloat(document.getElementById('lineThinning').value);
+            params.animSpeed = parseFloat(document.getElementById('animSpeed').value);
+            params.scale = parseFloat(document.getElementById('scale').value);
+            params.colorSpread = parseFloat(document.getElementById('colorSpread').value);
+            params.rotation = parseFloat(document.getElementById('rotation').value);
+            params.eccentricity = parseFloat(document.getElementById('eccentricity').value);
+            params.phaseOffset = parseFloat(document.getElementById('phaseOffset').value);
+            
+            let hexColor = document.getElementById('baseColor').value;
+            params.baseHue = hexToHue(hexColor);
+        }
+        
+        function resetSpirographs() {
+            spirographs = [];
+            theta = 0;
+            background(0, 0, 5);
+        }
+        
+        function updateValue(slider) {
+            let valueDisplay = document.getElementById(slider.id + '-value');
+            let value = parseFloat(slider.value);
+            valueDisplay.textContent = slider.step ? value.toFixed(3) : Math.round(value);
+            
+            updateAllParams();
+            
+            // Only reset for shape-changing parameters
+            let shapeParameters = ['outerRadius', 'innerRadius', 'centerSize', 'rotation', 'eccentricity', 'phaseOffset'];
+            if (shapeParameters.includes(slider.id)) {
+                resetSpirographs();
+            }
+            
+            // If trail length changed, trim existing trails immediately
+            if (slider.id === 'trailLength') {
+                for (let i = 0; i < spirographs.length; i++) {
+                    if (spirographs[i] && spirographs[i].length > params.trailLength) {
+                        // Trim from the beginning to keep the most recent points
+                        spirographs[i] = spirographs[i].slice(-params.trailLength);
+                    }
+                }
+            }
+        }
+        
+        function updateColor() {
+            updateAllParams();
+            // Color changes don't reset the pattern
+        }
+        
+        function shuffleParameters() {
+            document.getElementById('outerRadius').value = 80 + Math.random() * 150;
+            document.getElementById('innerRadius').value = 10 + Math.random() * 80;
+            document.getElementById('numPoints').value = Math.floor(1 + Math.random() * 8);
+            document.getElementById('centerSize').value = 10 + Math.random() * 80;
+            document.getElementById('trailLength').value = 50 + Math.random() * 400;
+            document.getElementById('lineWeight').value = 0.8 + Math.random() * 4;
+            document.getElementById('lineThinning').value = Math.random() * 0.8;
+            document.getElementById('animSpeed').value = 0.003 + Math.random() * 0.04;
+            document.getElementById('scale').value = 0.5 + Math.random() * 1.8;
+            document.getElementById('colorSpread').value = Math.random() * 360;
+            document.getElementById('rotation').value = Math.random() * 360;
+            document.getElementById('eccentricity').value = Math.random() * 1.5;
+            document.getElementById('phaseOffset').value = Math.random() * 6.28;
+            
+            // Random color
+            let hue = Math.floor(Math.random() * 360);
+            let saturation = 70 + Math.random() * 30;
+            let lightness = 40 + Math.random() * 40;
+            document.getElementById('baseColor').value = hslToHex(hue, saturation, lightness);
+            
+            // Update displays
+            document.querySelectorAll('input[type="range"]').forEach(slider => {
+                updateValue(slider);
+            });
+            
+            resetSpirographs();
+        }
+        
+        function saveCanvas() {
+            saveFrames('spirograph', 'png', 1, 1);
+        }
+        
+        function hexToHue(hex) {
+            let r = parseInt(hex.slice(1, 3), 16) / 255;
+            let g = parseInt(hex.slice(3, 5), 16) / 255;
+            let b = parseInt(hex.slice(5, 7), 16) / 255;
+            
+            let max = Math.max(r, g, b);
+            let min = Math.min(r, g, b);
+            let h;
+            
+            if (max === min) {
+                h = 0;
+            } else {
+                let d = max - min;
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            
+            return h * 360;
+        }
+        
+        function hslToHex(h, s, l) {
+            h /= 360;
+            s /= 100;
+            l /= 100;
+            
+            let r, g, b;
+            
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                let hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                
+                let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                let p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            
+            let toHex = (c) => {
+                let hex = Math.round(c * 255).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            };
+            
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+        
+        // Initialize value displays
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('input[type="range"]').forEach(slider => {
+                let valueDisplay = document.getElementById(slider.id + '-value');
+                let value = parseFloat(slider.value);
+                valueDisplay.textContent = slider.step ? value.toFixed(3) : Math.round(value);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -101,6 +101,8 @@ button:hover {
   letter-spacing: 0.5px;
   border-radius: 4px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); /* Subtle shadow */
+  /* --- THE FIX IS HERE --- */
+  display: inline-block; 
 }
 
 /* Style for the save/shuffle buttons in the controls panel */
