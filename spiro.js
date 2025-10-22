@@ -1,40 +1,180 @@
-let params = {};
-let spirographs = [];
-let theta = 0;
-let fullscreenMode = false;
-let canvasEl = null;
+// spiro.js — Updated version with Option 2 fix and slider patch
+
+let params = {
+  outerRadius: 180,
+  innerRadius: 80,
+  centerSize: 60,
+  numPoints: 12,
+  scale: 1.0,
+  numLayers: 2,
+  layerOffsetMode: "radius",
+  layerOffsetAmount: 0.06,
+  reverseLayers: false,
+  animSpeed: 0.04,
+  trailLength: 50,
+  lineWeight: 1.6,
+  lineThinning: 0.7,
+  baseHue: 260,
+  colorSpread: 120,
+};
+
+let curveType = "hypotrochoid";
+let secondaryCurve = "epitrochoid";
+let dualCurveMode = false;
+let dualModeType = "blend";
 let themeTransition = null;
+let spirographs = [];
+let lastTime = 0;
 
-// The definitive list of parameters that can be smoothly transitioned without a hard reset.
-const AESTHETIC_PARAMS = ['animSpeed', 'trailLength', 'lineWeight', 'lineThinning', 'baseHue', 'colorSpread', 'scale']; 
-
-function getCanvasSize() {
-  const controls = document.getElementById("controls");
-  const rect = controls?.getBoundingClientRect() || { width: 300, height: 300 };
-  if (fullscreenMode) return { w: window.innerWidth, h: window.innerHeight };
-  if (window.innerWidth <= 720) return { w: window.innerWidth, h: window.innerHeight - rect.height };
-  return { w: window.innerWidth - rect.width, h: window.innerHeight };
+// Example initialization
+function setup() {
+  const container = document.getElementById("canvas-container");
+  let cnv = createCanvas(windowWidth, windowHeight);
+  cnv.parent(container);
+  colorMode(HSB, 360, 100, 100, 100);
+  angleMode(RADIANS);
+  noFill();
+  initSpirographs();
 }
 
-function setup() {
-  const { w, h } = getCanvasSize();
-  const c = createCanvas(w, h);
-  canvasEl = c.canvas;
-  c.parent("canvas-container");
-  colorMode(HSB, 360, 100, 100, 100);
-  frameRate(60);
-  // FIX: Add strokeCap(ROUND) here to make line segments connect smoothly
-  strokeCap(ROUND); 
-  updateAllParams();
-  resetSpirographs();
+// Main animation loop
+function draw() {
+  background(0, 0, 0, 10);
+  translate(width / 2, height / 2);
+  for (let s of spirographs) {
+    s.update();
+    s.display();
+  }
+}
+
+function initSpirographs() {
+  spirographs = [];
+  for (let i = 0; i < params.numLayers; i++) {
+    spirographs.push(
+      new Spirograph({
+        ...params,
+        layerIndex: i,
+      })
+    );
+  }
+}
+
+// Smart reset — avoids freezes when updating geometry parameters
+function resetSpirographs() {
+  spirographs = [];
+  for (let i = 0; i < params.numLayers; i++) {
+    spirographs.push(
+      new Spirograph({
+        ...params,
+        layerIndex: i,
+      })
+    );
+  }
+}
+
+function updateAllParams() {
+  for (let s of spirographs) {
+    Object.assign(s, params);
+  }
+}
+
+// Event listener setup
+window.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("#controls input, #controls select").forEach((input) => {
+    const valueDisplay = document.getElementById(`${input.id}-value`);
+    if (valueDisplay) {
+      const updateDisplay = () => {
+        const value = input.value;
+        const step = String(input.step || "").includes(".") ? parseFloat(value).toFixed(2) : value;
+        valueDisplay.textContent = step;
+      };
+      updateDisplay();
+      input.addEventListener("input", updateDisplay);
+    }
+
+    input.addEventListener("input", () => {
+      const paramName = input.id;
+      const newValue = input.type === "checkbox" ? input.checked : parseFloat(input.value);
+      params[paramName] = newValue;
+
+      if (["curveType", "secondaryCurve", "dualCurveMode", "dualModeType"].includes(paramName)) {
+        curveType = document.getElementById("curveType").value;
+        secondaryCurve = document.getElementById("secondaryCurve").value;
+        dualCurveMode = document.getElementById("dualCurveMode").checked;
+        dualModeType = document.getElementById("dualModeType").value;
+        updateAllParams();
+        resetSpirographs();
+      } else if (AESTHETIC_PARAMS.includes(paramName)) {
+        startParameterTransition(paramName, newValue, 300);
+      } else {
+        if (themeTransition) themeTransition = null; // cancel active transition (Option 2 fix)
+        updateAllParams();
+        resetSpirographs();
+      }
+    });
+  });
+});
+
+const AESTHETIC_PARAMS = [
+  "animSpeed",
+  "trailLength",
+  "lineWeight",
+  "lineThinning",
+  "baseHue",
+  "colorSpread",
+];
+
+function startParameterTransition(param, targetValue, duration) {
+  if (themeTransition) themeTransition = null;
+  const startValue = params[param];
+  const startTime = millis();
+
+  themeTransition = { param, startValue, targetValue, duration, startTime };
+}
+
+function updateTransitions() {
+  if (!themeTransition) return;
+
+  const { param, startValue, targetValue, duration, startTime } = themeTransition;
+  const elapsed = millis() - startTime;
+  const t = constrain(elapsed / duration, 0, 1);
+  params[param] = lerp(startValue, targetValue, t);
+  if (t >= 1) themeTransition = null;
+}
+
+// Simplified spirograph object
+class Spirograph {
+  constructor(cfg) {
+    Object.assign(this, cfg);
+    this.angle = 0;
+  }
+
+  update() {
+    this.angle += this.animSpeed;
+  }
+
+  display() {
+    stroke(
+      (this.baseHue + this.layerIndex * this.colorSpread) % 360,
+      100,
+      100,
+      100
+    );
+    strokeWeight(this.lineWeight);
+    beginShape();
+    for (let i = 0; i < this.numPoints; i++) {
+      const a = i * TWO_PI / this.numPoints + this.angle;
+      const x = cos(a) * this.outerRadius * this.scale;
+      const y = sin(a) * this.innerRadius * this.scale;
+      vertex(x, y);
+    }
+    endShape(CLOSE);
+  }
 }
 
 function windowResized() {
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  resetSpirographs();
-}
-
+  resizeCanvas(windowWidth, windowHeight);
+  }
 function resetSpirographs() {
   spirographs = [];
   theta = 0;
