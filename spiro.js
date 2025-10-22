@@ -1,8 +1,10 @@
-// spiro.js — with fixes and Option B single-point trails
-// - Supports both #numPoints and #numberOfPoints inputs
-// - Exposes legacy globals: window.currentParams and window.spiroParams
-// - Mirrors params.numberOfPoints <-> params.numPoints
-// - Option B: draws a dot when a layer has only one point in its trail
+// spiro.js — resilient version for mobile/overlays + Option B dot
+// - Debounced resize/fullscreen; no hard reset on resize
+// - Guards resizeCanvas until p5 is ready (prevents "resizeCanvas is not defined")
+// - Debounced hard reset for geometry sliders so trails can grow
+// - Legacy aliases + numberOfPoints <-> numPoints mirror
+// - Option B: draw a dot when a trail has only one point
+// - push/pop around translated drawing so transforms don’t leak
 
 let params = {};
 let spirographs = [];
@@ -12,14 +14,19 @@ let canvasEl = null;
 let themeTransition = null; // used for theme shuffle
 let transitions = []; // used for smoothing aesthetic parameter changes
 
-// Legacy/global aliases to prevent "currentParams is not defined" errors
+let p5Ready = false;
+let resizeTimer = null;
+let lastCanvasSize = { w: 0, h: 0 };
+let hardResetTimer = null;
+
+// Legacy/global aliases so old code/console still works
 if (typeof window !== 'undefined') {
   window.params = params;
   window.currentParams = params;   // legacy alias
   window.spiroParams = params;     // legacy alias
 }
 
-// Mirror property so currentParams.numberOfPoints works like params.numPoints
+// Mirror numberOfPoints <-> numPoints
 try {
   Object.defineProperty(params, 'numberOfPoints', {
     get() { return this.numPoints; },
@@ -27,11 +34,9 @@ try {
     enumerable: true,
     configurable: true
   });
-} catch (e) {
-  // ignore if already defined
-}
+} catch (e) {}
 
-// The definitive list of parameters that can be smoothly transitioned without a hard reset.
+// Parameters that can be smoothly transitioned without hard resets
 const AESTHETIC_PARAMS = [
   'animSpeed',
   'trailLength',
@@ -50,6 +55,33 @@ function getCanvasSize() {
   return { w: window.innerWidth - rect.width, h: window.innerHeight };
 }
 
+// Debounced resize handler (no hard reset)
+function onWindowResize() {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!p5Ready) return;
+    const { w, h } = getCanvasSize();
+    if (w === lastCanvasSize.w && h === lastCanvasSize.h) return;
+    if (typeof resizeCanvas === 'function') {
+      resizeCanvas(w, h);
+    } else if (canvasEl) {
+      // Fallback if p5 isn't exposed in global mode (should be rare)
+      canvasEl.width = w;
+      canvasEl.height = h;
+    }
+    lastCanvasSize = { w, h };
+    // Do NOT reset trail here; let it continue to grow
+  }, 150);
+}
+
+// Debounced hard reset for geometry changes
+function scheduleHardReset(delay = 200) {
+  if (hardResetTimer) clearTimeout(hardResetTimer);
+  hardResetTimer = setTimeout(() => {
+    resetSpirographs();
+  }, delay);
+}
+
 function setup() {
   const { w, h } = getCanvasSize();
   const c = createCanvas(w, h);
@@ -60,12 +92,18 @@ function setup() {
   strokeCap(ROUND);
   updateAllParams();
   resetSpirographs();
-}
 
-function windowResized() {
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  resetSpirographs();
+  // Mark p5 ready and attach listeners after p5 exists
+  p5Ready = true;
+  lastCanvasSize = { w: width, h: height };
+
+  window.addEventListener("resize", onWindowResize);
+  document.addEventListener("fullscreenchange", () => {
+    const controls = document.getElementById("controls");
+    fullscreenMode = !!document.fullscreenElement;
+    if (controls) controls.style.display = fullscreenMode ? "none" : "block";
+    onWindowResize(); // just resize; no hard reset
+  });
 }
 
 function resetSpirographs() {
@@ -82,10 +120,9 @@ function resetSpirographs() {
 function draw() {
   if (!params || Object.keys(params).length === 0) return;
 
-  // 1. Handle themeTransition (shuffle) if active — this is separate from small aesthetic transitions
+  // 1. Handle themeTransition (shuffle) if active
   if (themeTransition) {
     const t = constrain((millis() - themeTransition.start) / themeTransition.duration, 0, 1);
-
     for (const key in themeTransition.to) {
       if (typeof themeTransition.from[key] === 'number') {
         params[key] = lerp(themeTransition.from[key], themeTransition.to[key], t);
@@ -93,7 +130,6 @@ function draw() {
         params[key] = themeTransition.to[key];
       }
     }
-
     if (t === 1) {
       themeTransition = null;
     }
@@ -112,21 +148,18 @@ function draw() {
   // Recalculate and draw the current frame
   drawSpirograph();
 
-  // 3. Flash effect if any
+  // 3. Flash effect if any (full overlay in screen coords)
   if (params.flash > 0) {
     push();
     noStroke();
     fill(0, 0, 100, params.flash);
-    rectMode(CENTER);
-    rect(width / 2, height / 2, width, height);
+    rectMode(CORNER);
+    rect(0, 0, width, height);
     pop();
   }
 }
 
 // =================================================================
-// PARAMETER/THEME LOGIC
-// =================================================================
-
 function startParameterTransition(paramName, newValue, duration = 300) {
   // Remove existing transition for same param
   transitions = transitions.filter(t => t.param !== paramName);
@@ -152,8 +185,6 @@ function updateTransitions() {
     params[t.param] = lerp(t.from, t.to, eased);
     if (pct >= 1) transitions.splice(i, 1);
   }
-
-  // Note: do NOT call updateAllParams() here — it would overwrite the smoothed values
 }
 
 function easeInOutCubic(x) {
@@ -161,40 +192,38 @@ function easeInOutCubic(x) {
 }
 
 function updateAllParams() {
-  // Reads ALL parameter values from the DOM and updates the 'params' object
   const el = id => document.getElementById(id);
 
-  params.curveType = el('curveType') ? el('curveType').value : (params.curveType || 'hypotrochoid');
-  params.outerRadius = el('outerRadius') ? parseFloat(el('outerRadius').value) : (params.outerRadius || 180);
-  params.innerRadius = el('innerRadius') ? parseFloat(el('innerRadius').value) : (params.innerRadius || 80);
-  params.centerSize = el('centerSize') ? parseFloat(el('centerSize').value) : (params.centerSize || 60);
+  params.curveType = el('curveType') ? el('curveType').value : (params.curveType ?? 'hypotrochoid');
+  params.outerRadius = el('outerRadius') ? parseFloat(el('outerRadius').value) : (params.outerRadius ?? 180);
+  params.innerRadius = el('innerRadius') ? parseFloat(el('innerRadius').value) : (params.innerRadius ?? 80);
+  params.centerSize = el('centerSize') ? parseFloat(el('centerSize').value) : (params.centerSize ?? 60);
 
   // Support either #numPoints or #numberOfPoints
   {
     const npEl = el('numPoints') || el('numberOfPoints');
     const raw = npEl ? parseInt(npEl.value, 10) : params.numPoints;
-    params.numPoints = Number.isFinite(raw) ? raw : (params.numPoints || 12);
+    params.numPoints = Number.isFinite(raw) ? raw : (params.numPoints ?? 12);
   }
 
-  params.dualCurveMode = el('dualCurveMode') ? el('dualCurveMode').checked : (params.dualCurveMode || false);
-  params.secondaryCurve = el('secondaryCurve') ? el('secondaryCurve').value : (params.secondaryCurve || 'hypotrochoid');
-  params.dualModeType = el('dualModeType') ? el('dualModeType').value : (params.dualModeType || 'blend');
+  params.dualCurveMode = el('dualCurveMode') ? el('dualCurveMode').checked : (params.dualCurveMode ?? false);
+  params.secondaryCurve = el('secondaryCurve') ? el('secondaryCurve').value : (params.secondaryCurve ?? 'hypotrochoid');
+  params.dualModeType = el('dualModeType') ? el('dualModeType').value : (params.dualModeType ?? 'blend');
 
-  params.numLayers = el('numLayers') ? parseInt(el('numLayers').value, 10) : (params.numLayers || 2);
-  params.layerOffsetMode = el('layerOffsetMode') ? el('layerOffsetMode').value : (params.layerOffsetMode || 'radius');
-  params.layerOffsetAmount = el('layerOffsetAmount') ? parseFloat(el('layerOffsetAmount').value) : (params.layerOffsetAmount || 0.06);
-  params.reverseLayers = el('reverseLayers') ? el('reverseLayers').checked : (params.reverseLayers || false);
+  params.numLayers = el('numLayers') ? parseInt(el('numLayers').value, 10) : (params.numLayers ?? 2);
+  params.layerOffsetMode = el('layerOffsetMode') ? el('layerOffsetMode').value : (params.layerOffsetMode ?? 'radius');
+  params.layerOffsetAmount = el('layerOffsetAmount') ? parseFloat(el('layerOffsetAmount').value) : (params.layerOffsetAmount ?? 0.06);
+  params.reverseLayers = el('reverseLayers') ? el('reverseLayers').checked : (params.reverseLayers ?? false);
 
-  params.scale = el('scale') ? parseFloat(el('scale').value) : (params.scale || 1.0);
-  params.animSpeed = el('animSpeed') ? parseFloat(el('animSpeed').value) : (params.animSpeed || 0.04);
-  params.trailLength = el('trailLength') ? parseInt(el('trailLength').value, 10) : (params.trailLength || 50);
-  params.lineWeight = el('lineWeight') ? parseFloat(el('lineWeight').value) : (params.lineWeight || 1.6);
-  params.lineThinning = el('lineThinning') ? parseFloat(el('lineThinning').value) : (params.lineThinning || 0.7);
-  params.baseHue = el('baseHue') ? parseFloat(el('baseHue').value) : (params.baseHue || 260);
-  params.colorSpread = el('colorSpread') ? parseFloat(el('colorSpread').value) : (params.colorSpread || 120);
+  params.scale = el('scale') ? parseFloat(el('scale').value) : (params.scale ?? 1.0);
+  params.animSpeed = el('animSpeed') ? parseFloat(el('animSpeed').value) : (params.animSpeed ?? 0.04);
+  params.trailLength = el('trailLength') ? parseInt(el('trailLength').value, 10) : (params.trailLength ?? 50);
+  params.lineWeight = el('lineWeight') ? parseFloat(el('lineWeight').value) : (params.lineWeight ?? 1.6);
+  params.lineThinning = el('lineThinning') ? parseFloat(el('lineThinning').value) : (params.lineThinning ?? 0.7);
+  params.baseHue = el('baseHue') ? parseFloat(el('baseHue').value) : (params.baseHue ?? 260);
+  params.colorSpread = el('colorSpread') ? parseFloat(el('colorSpread').value) : (params.colorSpread ?? 120);
 
-  // Ensure flash exists
-  params.flash = params.flash || 0;
+  params.flash = params.flash ?? 0;
 }
 
 // =================================================================
@@ -206,11 +235,11 @@ function shuffleTheme() {
 
   const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
 
-  // 1. HARD RESET CORE LOGIC
+  // HARD RESET CORE LOGIC
   spirographs = [];
   theta = 0;
 
-  // 2. Immediately apply geometric params
+  // Apply geometric params
   params.curveType = choice.curveType || "hypotrochoid";
   params.dualCurveMode = !!choice.dual;
   params.secondaryCurve = choice.secondary || "hypotrochoid";
@@ -219,19 +248,19 @@ function shuffleTheme() {
   params.outerRadius = choice.outer ?? 180;
   params.innerRadius = choice.inner ?? 80;
   params.centerSize = choice.center ?? 60;
-  params.numPoints = choice.points ?? 12;    // also mirrors to numberOfPoints via defineProperty
+  params.numPoints = choice.points ?? 12;
   params.numLayers = choice.layers ?? 2;
 
   params.layerOffsetMode = choice.offset || "radius";
   params.layerOffsetAmount = choice.offsetAmount ?? 0.06;
   params.reverseLayers = !!choice.reverse;
 
-  // 3. Hard clear background and set base hue
+  // Clear background and set base hue
   const newHue = choice.hue ?? 260;
   background(newHue, 80, 10);
   params.baseHue = newHue;
 
-  // 4. Initiate themeTransition for aesthetics + flash
+  // Transition aesthetics + flash
   themeTransition = {
     from: {
       animSpeed: params.animSpeed,
@@ -327,11 +356,8 @@ function getPolarCoordinate(thetaLocal, layer) {
 
     case "superformula": {
       const m = params.numPoints;
-      const n1 = 1.0;
-      const n2 = 1.0;
-      const n3 = 1.0;
-      const a = 1;
-      const b = 1;
+      const n1 = 1.0, n2 = 1.0, n3 = 1.0;
+      const a = 1, b = 1;
       const phi = currentTheta;
       const t1 = Math.pow(Math.abs(Math.cos(m * phi / 4) / a), n2);
       const t2 = Math.pow(Math.abs(Math.sin(m * phi / 4) / b), n3);
@@ -361,13 +387,8 @@ function getPolarCoordinate(thetaLocal, layer) {
       const rotationFactor = (curveTypeLocal === "hypotrochoid") ? (k - 1) : (k + 1);
       const secondAngle = currentTheta * rotationFactor;
 
-      if (curveTypeLocal === "hypotrochoid") {
-        x = (R - r_) * cos(currentTheta) + d * cos(secondAngle);
-        y = (R - r_) * sin(currentTheta) - d * sin(secondAngle);
-      } else { // fallback safety
-        x = (R - r_) * cos(currentTheta) + d * cos(secondAngle);
-        y = (R - r_) * sin(currentTheta) - d * sin(secondAngle);
-      }
+      x = (R - r_) * cos(currentTheta) + d * cos(secondAngle);
+      y = (R - r_) * sin(currentTheta) - d * sin(secondAngle);
     }
   }
 
@@ -379,6 +400,7 @@ function getPolarCoordinate(thetaLocal, layer) {
 // =================================================================
 
 function drawSpirograph() {
+  push(); // ensure translate doesn't leak
   noFill();
   translate(width / 2, height / 2);
 
@@ -386,42 +408,62 @@ function drawSpirograph() {
     for (let i = 0; i < params.numLayers; i++) spirographs.push([]);
   }
 
+  // Add the current point for each layer
   for (let i = 0; i < params.numLayers; i++) {
     const point = getPolarCoordinate(theta, i);
     spirographs[i].push(point);
   }
 
-  const maxLen = params.trailLength;
-  for (let i = 0; i < params.numLayers; i++) {
-    if (spirographs[i].length > maxLen) spirographs[i].shift();
-  }
-
+  // Trim trails
+  const maxLen = Math.max(0, params.trailLength | 0);
   for (let i = 0; i < params.numLayers; i++) {
     const layer = spirographs[i];
+    while (layer.length > maxLen && maxLen > 0) layer.shift();
+    if (maxLen === 0) spirographs[i] = []; // no history
+  }
 
-    for (let j = 0; j < layer.length; j++) {
-      const p = layer[j];
-      const t = (layer.length > 0) ? j / layer.length : 0;
+  // Draw
+  if (maxLen > 0) {
+    for (let i = 0; i < params.numLayers; i++) {
+      const layer = spirographs[i];
 
+      for (let j = 0; j < layer.length; j++) {
+        const p = layer[j];
+        const t = (layer.length > 0) ? j / layer.length : 0;
+
+        let colorFactor = 1;
+        if (params.reverseLayers) colorFactor = (i % 2 === 0) ? 1 : -1;
+
+        const hueVal = (params.baseHue + (t * params.colorSpread * colorFactor) + (i * 360 / Math.max(1, params.numLayers))) % 360;
+        const alpha = map(t, 0, 1, 30, 100);
+        const weight = map(t, 0, 1, params.lineWeight * params.lineThinning, params.lineWeight);
+
+        stroke(hueVal, 80, 95, alpha);
+        strokeWeight(weight);
+
+        if (j > 0) {
+          const pPrev = layer[j - 1];
+          line(pPrev.x, pPrev.y, p.x, p.y);
+        } else if (layer.length === 1) {
+          // Option B: draw a dot when only one sample exists
+          point(p.x, p.y);
+        }
+      }
+    }
+  } else {
+    // No history: draw an ephemeral dot per layer
+    for (let i = 0; i < params.numLayers; i++) {
+      const p = getPolarCoordinate(theta, i);
       let colorFactor = 1;
       if (params.reverseLayers) colorFactor = (i % 2 === 0) ? 1 : -1;
 
-      const hue = (params.baseHue + (t * params.colorSpread * colorFactor) + (i * 360 / Math.max(1, params.numLayers))) % 360;
-      const alpha = map(t, 0, 1, 30, 100);
-      const weight = map(t, 0, 1, params.lineWeight * params.lineThinning, params.lineWeight);
-
-      stroke(hue, 80, 95, alpha);
-      strokeWeight(weight);
-
-      if (j > 0) {
-        const pPrev = layer[j - 1];
-        line(pPrev.x, pPrev.y, p.x, p.y);
-      } else if (layer.length === 1) {
-        // Option B: draw a dot when there’s only a single point in the trail
-        point(p.x, p.y);
-      }
+      const hueVal = (params.baseHue + (i * 360 / Math.max(1, params.numLayers))) % 360;
+      stroke(hueVal, 80, 95, 100);
+      strokeWeight(params.lineWeight * params.lineThinning);
+      point(p.x, p.y);
     }
   }
+  pop();
 }
 
 // =================================================================
@@ -429,29 +471,17 @@ function drawSpirograph() {
 // =================================================================
 
 function toggleFullscreenCanvas() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(err => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) {
+    el.requestFullscreen().catch(err => {
       console.error(`Error attempting to enable full-screen mode: ${err.message}`);
     });
-  } else {
+  } else if (document.exitFullscreen) {
     document.exitFullscreen();
+  } else {
+    console.error('Fullscreen is not supported');
   }
 }
-
-window.addEventListener("resize", () => {
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  resetSpirographs();
-});
-
-document.addEventListener("fullscreenchange", () => {
-  const controls = document.getElementById("controls");
-  fullscreenMode = !!document.fullscreenElement;
-  if (controls) controls.style.display = fullscreenMode ? "none" : "block";
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  resetSpirographs();
-});
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
@@ -470,9 +500,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     input.addEventListener("input", () => {
       // Update display value
-      const display = document.getElementById(input.id + "-value");
-      if (display) {
-        display.textContent = String(input.step || "").includes('.')
+      const ds = document.getElementById(input.id + "-value");
+      if (ds) {
+        ds.textContent = String(input.step || "").includes('.')
           ? parseFloat(input.value).toFixed(2)
           : Math.round(input.value);
       }
@@ -480,23 +510,21 @@ document.addEventListener("DOMContentLoaded", () => {
       const paramName = input.id;
       const newValue = parseFloat(input.value);
 
-      // If aesthetic, smooth transition
       if (AESTHETIC_PARAMS.includes(paramName)) {
+        // Smooth transition for aesthetic params
         startParameterTransition(paramName, newValue, 300);
       } else {
-        // Cancel themeTransition so geometry updates apply immediately
+        // Geometry update: apply immediately but debounce the hard reset
         if (themeTransition) themeTransition = null;
-        // Update DOM-read params and hard reset
         updateAllParams();
-        resetSpirographs();
+        scheduleHardReset(200);
       }
     });
   });
 
-  // Selects and checkboxes trigger hard reset on change
+  // Selects and checkboxes trigger immediate hard reset on change
   document.querySelectorAll("select, input[type=checkbox]").forEach(el => {
     el.addEventListener("change", () => {
-      // Cancel themeTransition so the structural changes apply instantly
       if (themeTransition) themeTransition = null;
       updateAllParams();
       resetSpirographs();
