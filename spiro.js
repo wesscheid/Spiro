@@ -1,7 +1,7 @@
-// spiro.js — Full updated file
-// - Fix: slider display uses String(input.step || "").includes('.')
-// - Fix: Option 2 smart reset (cancel themeTransition when geometry params change)
-// - Added transitions[] system for smooth aesthetic transitions
+// spiro.js — with fixes and Option B single-point trails
+// - Supports both #numPoints and #numberOfPoints inputs
+// - Exposes legacy globals: window.currentParams and window.spiroParams
+// - Option B: draws a dot when a layer has only one point in its trail
 
 let params = {};
 let spirographs = [];
@@ -10,6 +10,13 @@ let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null; // used for theme shuffle
 let transitions = []; // used for smoothing aesthetic parameter changes
+
+// Legacy/global aliases to prevent "currentParams is not defined" errors
+if (typeof window !== 'undefined') {
+  window.params = params;
+  window.currentParams = params;   // legacy alias
+  window.spiroParams = params;     // legacy alias
+}
 
 // The definitive list of parameters that can be smoothly transitioned without a hard reset.
 const AESTHETIC_PARAMS = [
@@ -98,7 +105,8 @@ function draw() {
     noStroke();
     fill(0, 0, 100, params.flash);
     rectMode(CENTER);
-    rect(0, 0, width, height);
+    // Note: center rect for full-screen flash; adjust if desired
+    rect(width / 2, height / 2, width, height);
     pop();
   }
 }
@@ -152,20 +160,26 @@ function updateAllParams() {
   params.outerRadius = el('outerRadius') ? parseFloat(el('outerRadius').value) : (params.outerRadius || 180);
   params.innerRadius = el('innerRadius') ? parseFloat(el('innerRadius').value) : (params.innerRadius || 80);
   params.centerSize = el('centerSize') ? parseFloat(el('centerSize').value) : (params.centerSize || 60);
-  params.numPoints = el('numPoints') ? parseInt(el('numPoints').value) : (params.numPoints || 12);
+
+  // Support either #numPoints or #numberOfPoints
+  {
+    const npEl = el('numPoints') || el('numberOfPoints');
+    const raw = npEl ? parseInt(npEl.value, 10) : params.numPoints;
+    params.numPoints = Number.isFinite(raw) ? raw : (params.numPoints || 12);
+  }
 
   params.dualCurveMode = el('dualCurveMode') ? el('dualCurveMode').checked : (params.dualCurveMode || false);
   params.secondaryCurve = el('secondaryCurve') ? el('secondaryCurve').value : (params.secondaryCurve || 'hypotrochoid');
   params.dualModeType = el('dualModeType') ? el('dualModeType').value : (params.dualModeType || 'blend');
 
-  params.numLayers = el('numLayers') ? parseInt(el('numLayers').value) : (params.numLayers || 2);
+  params.numLayers = el('numLayers') ? parseInt(el('numLayers').value, 10) : (params.numLayers || 2);
   params.layerOffsetMode = el('layerOffsetMode') ? el('layerOffsetMode').value : (params.layerOffsetMode || 'radius');
   params.layerOffsetAmount = el('layerOffsetAmount') ? parseFloat(el('layerOffsetAmount').value) : (params.layerOffsetAmount || 0.06);
   params.reverseLayers = el('reverseLayers') ? el('reverseLayers').checked : (params.reverseLayers || false);
 
   params.scale = el('scale') ? parseFloat(el('scale').value) : (params.scale || 1.0);
   params.animSpeed = el('animSpeed') ? parseFloat(el('animSpeed').value) : (params.animSpeed || 0.04);
-  params.trailLength = el('trailLength') ? parseInt(el('trailLength').value) : (params.trailLength || 50);
+  params.trailLength = el('trailLength') ? parseInt(el('trailLength').value, 10) : (params.trailLength || 50);
   params.lineWeight = el('lineWeight') ? parseFloat(el('lineWeight').value) : (params.lineWeight || 1.6);
   params.lineThinning = el('lineThinning') ? parseFloat(el('lineThinning').value) : (params.lineThinning || 0.7);
   params.baseHue = el('baseHue') ? parseFloat(el('baseHue').value) : (params.baseHue || 260);
@@ -386,7 +400,6 @@ function drawSpirograph() {
 
       const hue = (params.baseHue + (t * params.colorSpread * colorFactor) + (i * 360 / Math.max(1, params.numLayers))) % 360;
       const alpha = map(t, 0, 1, 30, 100);
-
       const weight = map(t, 0, 1, params.lineWeight * params.lineThinning, params.lineWeight);
 
       stroke(hue, 80, 95, alpha);
@@ -395,6 +408,9 @@ function drawSpirograph() {
       if (j > 0) {
         const pPrev = layer[j - 1];
         line(pPrev.x, pPrev.y, p.x, p.y);
+      } else if (layer.length === 1) {
+        // Option B: draw a dot when there’s only a single point in the trail
+        point(p.x, p.y);
       }
     }
   }
@@ -439,14 +455,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Initial display value
     if (display) {
-      display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
+      display.textContent = String(input.step || "").includes('.')
+        ? parseFloat(input.value).toFixed(2)
+        : Math.round(input.value);
     }
 
     input.addEventListener("input", () => {
       // Update display value
       const display = document.getElementById(input.id + "-value");
       if (display) {
-        display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
+        display.textContent = String(input.step || "").includes('.')
+          ? parseFloat(input.value).toFixed(2)
+          : Math.round(input.value);
       }
 
       const paramName = input.id;
@@ -456,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (AESTHETIC_PARAMS.includes(paramName)) {
         startParameterTransition(paramName, newValue, 300);
       } else {
-        // Option 2: cancel themeTransition so geometry updates apply immediately
+        // Cancel themeTransition so geometry updates apply immediately
         if (themeTransition) themeTransition = null;
         // Update DOM-read params and hard reset
         updateAllParams();
@@ -468,7 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Selects and checkboxes trigger hard reset on change
   document.querySelectorAll("select, input[type=checkbox]").forEach(el => {
     el.addEventListener("change", () => {
-      // If themeTransition is active, cancel it so the structural changes apply instantly
+      // Cancel themeTransition so the structural changes apply instantly
       if (themeTransition) themeTransition = null;
       updateAllParams();
       resetSpirographs();
