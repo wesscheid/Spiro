@@ -47,6 +47,14 @@ const AESTHETIC_PARAMS = [
   'scale'
 ];
 
+function ensureLayerArrays(count) {
+  if (!Array.isArray(spirographs)) spirographs = [];
+  // Grow
+  for (let i = spirographs.length; i < count; i++) spirographs[i] = [];
+  // Shrink
+  if (spirographs.length > count) spirographs.length = count;
+}
+
 function getCanvasSize() {
   const controls = document.getElementById("controls");
   const rect = controls?.getBoundingClientRect() || { width: 300, height: 300 };
@@ -108,11 +116,11 @@ function setup() {
 
 function resetSpirographs() {
   spirographs = [];
+  ensureLayerArrays(params.numLayers);
   theta = 0;
   const bgHue = params.baseHue !== undefined ? params.baseHue : 290;
   background(bgHue, 80, 10);
 }
-
 // =================================================================
 // PRIMARY DRAW LOOP LOGIC
 // =================================================================
@@ -400,26 +408,26 @@ function getPolarCoordinate(thetaLocal, layer) {
 // =================================================================
 
 function drawSpirograph() {
-  push(); // ensure translate doesn't leak
+  push();
   noFill();
   translate(width / 2, height / 2);
 
-  if (spirographs.length === 0) {
-    for (let i = 0; i < params.numLayers; i++) spirographs.push([]);
-  }
+  // Always match spirographs to current layer count
+  ensureLayerArrays(params.numLayers);
+
+  // Coerce and allow 0 for ephemeral dot mode
+  const maxLen = Math.max(0, params.trailLength | 0);
 
   // Add the current point for each layer
   for (let i = 0; i < params.numLayers; i++) {
     const point = getPolarCoordinate(theta, i);
-    spirographs[i].push(point);
-  }
-
-  // Trim trails
-  const maxLen = Math.max(0, params.trailLength | 0);
-  for (let i = 0; i < params.numLayers; i++) {
-    const layer = spirographs[i];
-    while (layer.length > maxLen && maxLen > 0) layer.shift();
-    if (maxLen === 0) spirographs[i] = []; // no history
+    if (maxLen > 0) {
+      spirographs[i].push(point);
+      if (spirographs[i].length > maxLen) spirographs[i].shift();
+    } else {
+      // No history; don't accumulate
+      spirographs[i] = [];
+    }
   }
 
   // Draw
@@ -451,9 +459,10 @@ function drawSpirograph() {
       }
     }
   } else {
-    // No history: draw an ephemeral dot per layer
+    // Ephemeral dot mode: draw just the current frame’s point per layer
     for (let i = 0; i < params.numLayers; i++) {
       const p = getPolarCoordinate(theta, i);
+
       let colorFactor = 1;
       if (params.reverseLayers) colorFactor = (i % 2 === 0) ? 1 : -1;
 
