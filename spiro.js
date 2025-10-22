@@ -4,7 +4,7 @@
 // - Debounced hard reset for geometry sliders so trails can grow
 // - Legacy aliases + numberOfPoints <-> numPoints mirror
 // - Option B: draw a dot when a trail has only one point
-// - push/pop around translated drawing so transforms don’t leak
+// - push/pop around translated drawing so transforms don't leak
 
 let params = {};
 let spirographs = [];
@@ -418,7 +418,7 @@ function drawSpirograph() {
   // Coerce and allow 0 for ephemeral dot mode
   const maxLen = Math.max(0, params.trailLength | 0);
 
-  // Add the current point for each layer
+  // Add the current point for each layer - SIMPLER FIX: just use numPoints in the calculations
   for (let i = 0; i < params.numLayers; i++) {
     const point = getPolarCoordinate(theta, i);
     if (maxLen > 0) {
@@ -459,7 +459,7 @@ function drawSpirograph() {
       }
     }
   } else {
-    // Ephemeral dot mode: draw just the current frame’s point per layer
+    // Ephemeral dot mode: draw just the current frame's point per layer
     for (let i = 0; i < params.numLayers; i++) {
       const p = getPolarCoordinate(theta, i);
 
