@@ -1,6 +1,7 @@
 // spiro.js — with fixes and Option B single-point trails
 // - Supports both #numPoints and #numberOfPoints inputs
 // - Exposes legacy globals: window.currentParams and window.spiroParams
+// - Mirrors params.numberOfPoints <-> params.numPoints
 // - Option B: draws a dot when a layer has only one point in its trail
 
 let params = {};
@@ -16,6 +17,18 @@ if (typeof window !== 'undefined') {
   window.params = params;
   window.currentParams = params;   // legacy alias
   window.spiroParams = params;     // legacy alias
+}
+
+// Mirror property so currentParams.numberOfPoints works like params.numPoints
+try {
+  Object.defineProperty(params, 'numberOfPoints', {
+    get() { return this.numPoints; },
+    set(v) { this.numPoints = v; },
+    enumerable: true,
+    configurable: true
+  });
+} catch (e) {
+  // ignore if already defined
 }
 
 // The definitive list of parameters that can be smoothly transitioned without a hard reset.
@@ -105,7 +118,6 @@ function draw() {
     noStroke();
     fill(0, 0, 100, params.flash);
     rectMode(CENTER);
-    // Note: center rect for full-screen flash; adjust if desired
     rect(width / 2, height / 2, width, height);
     pop();
   }
@@ -132,18 +144,16 @@ function updateTransitions() {
   if (!transitions || transitions.length === 0) return;
 
   const now = millis();
-  let changed = false;
   for (let i = transitions.length - 1; i >= 0; i--) {
     const t = transitions[i];
     const elapsed = now - t.start;
     const pct = constrain(elapsed / t.duration, 0, 1);
     const eased = easeInOutCubic(pct);
     params[t.param] = lerp(t.from, t.to, eased);
-    changed = true;
     if (pct >= 1) transitions.splice(i, 1);
   }
 
-  if (changed) updateAllParams();
+  // Note: do NOT call updateAllParams() here — it would overwrite the smoothed values
 }
 
 function easeInOutCubic(x) {
@@ -152,8 +162,6 @@ function easeInOutCubic(x) {
 
 function updateAllParams() {
   // Reads ALL parameter values from the DOM and updates the 'params' object
-  // Defensive: check existence of elements before reading value
-
   const el = id => document.getElementById(id);
 
   params.curveType = el('curveType') ? el('curveType').value : (params.curveType || 'hypotrochoid');
@@ -211,7 +219,7 @@ function shuffleTheme() {
   params.outerRadius = choice.outer ?? 180;
   params.innerRadius = choice.inner ?? 80;
   params.centerSize = choice.center ?? 60;
-  params.numPoints = choice.points ?? 12;
+  params.numPoints = choice.points ?? 12;    // also mirrors to numberOfPoints via defineProperty
   params.numLayers = choice.layers ?? 2;
 
   params.layerOffsetMode = choice.offset || "radius";
