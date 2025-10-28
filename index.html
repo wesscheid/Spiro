@@ -6,8 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.2/p5.min.js"></script>
   <link rel="stylesheet" href="style.css">
-  <script src="themes.js"></script>
-  <script src="spiro.js"></script>
 </head>
 <body>
   <button id="fullscreenToggle">Toggle Fullscreen Canvas</button>
@@ -23,7 +21,7 @@
         <option value="rose">Rose Curve</option>
         <option value="lissajous">Lissajous</option>
         <option value="superformula">Superformula</option>
-        <option hidden value="harmonograph">Harmonograph</option>
+        <option value="harmonograph">Harmonograph</option>
       </select>
     </div>
 
@@ -41,77 +39,73 @@
         <option value="rose">Rose Curve</option>
         <option value="lissajous">Lissajous</option>
         <option value="superformula">Superformula</option>
-        <option hidden value="harmonograph">Harmonograph</option>
+        <option value="harmonograph">Harmonograph</option>
       </select>
     </div>
 
     <div class="control-group">
-      <label for="dualModeType">DUAL MODE</label>
+      <label for="dualModeType">DUAL MODE TYPE</label>
       <select id="dualModeType">
-        <option value="blend">Blend Curves (Slow)</option>
-        <option value="combine">Combine Points</option>
+        <option value="blend">Blend</option>
+        <option value="combine">Combine</option>
         <option value="alternate">Alternate Layers</option>
       </select>
     </div>
 
-    <button id="shuffleTheme" style="background: #e35050;">Shuffle Theme</button>
-    <button onclick="saveCanvas('spiro-capture', 'png')">Save Image</button>
-
-    <h2>Geometry</h2>
-
     <div class="control-group">
-      <label for="outerRadius">Outer Radius (R) <span id="outerRadius-value" class="value-display"></span></label>
-      <input id="outerRadius" type="range" min="10" max="300" step="1" value="180">
+      <button id="shuffleTheme">Shuffle Theme</button>
+    </div>
+
+    <!-- Example numeric controls — ensure these IDs match spiro.js updateAllParams expectations -->
+    <div class="control-group">
+      <label for="outerRadius">Outer Radius <span id="outerRadius-value" class="value-display"></span></label>
+      <input id="outerRadius" type="range" min="20" max="400" value="180" step="1">
     </div>
 
     <div class="control-group">
-      <label for="innerRadius">Inner Radius (r) <span id="innerRadius-value" class="value-display"></span></label>
-      <input id="innerRadius" type="range" min="10" max="250" step="1" value="80">
+      <label for="innerRadius">Inner Radius <span id="innerRadius-value" class="value-display"></span></label>
+      <input id="innerRadius" type="range" min="5" max="300" value="80" step="1">
     </div>
 
     <div class="control-group">
-      <label for="centerSize">Center Size (d) <span id="centerSize-value" class="value-display"></span></label>
-      <input id="centerSize" type="range" min="0" max="200" step="1" value="60">
+      <label for="centerSize">Center Size <span id="centerSize-value" class="value-display"></span></label>
+      <input id="centerSize" type="range" min="0" max="300" value="60" step="1">
     </div>
 
     <div class="control-group">
-      <label for="numPoints">Number of Points <span id="numPoints-value" class="value-display"></span></label>
-      <input id="numPoints" type="range" min="1" max="30" step="1" value="12">
+      <label for="numPoints">Points <span id="numPoints-value" class="value-display"></span></label>
+      <input id="numPoints" type="range" min="1" max="64" value="12" step="1">
     </div>
 
     <div class="control-group">
-      <label for="scale">Scale (Zoom) <span id="scale-value" class="value-display"></span></label>
-      <input id="scale" type="range" min="0.1" max="2" step="0.01" value="1.0">
+      <label for="scale">Scale <span id="scale-value" class="value-display"></span></label>
+      <input id="scale" type="range" min="0.1" max="2" value="1" step="0.01">
     </div>
 
-    <h2>Layers & Offsets</h2>
-
     <div class="control-group">
-      <label for="numLayers">Number of Layers <span id="numLayers-value" class="value-display"></span></label>
-      <input id="numLayers" type="range" min="1" max="6" step="1" value="2">
+      <label for="numLayers">Layers <span id="numLayers-value" class="value-display"></span></label>
+      <input id="numLayers" type="range" min="1" max="16" value="2" step="1">
     </div>
 
     <div class="control-group">
       <label for="layerOffsetMode">Layer Offset Mode</label>
       <select id="layerOffsetMode">
-        <option value="radius" selected>Radius</option>
+        <option value="radius">Radius</option>
         <option value="rotation">Rotation</option>
         <option value="phase">Phase</option>
       </select>
     </div>
 
     <div class="control-group">
-      <label for="layerOffsetAmount">Offset Amount <span id="layerOffsetAmount-value" class="value-display"></span></label>
+      <label for="layerOffsetAmount">Layer Offset Amount <span id="layerOffsetAmount-value" class="value-display"></span></label>
       <input id="layerOffsetAmount" type="range" min="0" max="1" step="0.01" value="0.06">
     </div>
 
     <div class="control-group">
       <label>
-        <input type="checkbox" id="reverseLayers"> REVERSE ALTERNATE LAYERS
+        <input type="checkbox" id="reverseLayers"> Reverse Alternate Layers
       </label>
     </div>
-
-    <h2>Aesthetics</h2>
 
     <div class="control-group">
       <label for="animSpeed">Anim Speed <span id="animSpeed-value" class="value-display"></span></label>
@@ -142,10 +136,11 @@
       <label for="colorSpread">Color Spread <span id="colorSpread-value" class="value-display"></span></label>
       <input id="colorSpread" type="range" min="0" max="360" step="1" value="120">
     </div>
-
   </div>
 
-  <div id="canvas-container">
-    </div>
+  <div id="canvas-container"></div>
+
+  <script src="themes.js"></script>
+  <script src="spiro.js"></script>
 </body>
 </html>

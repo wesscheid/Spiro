@@ -23,6 +23,8 @@ function setup() {
   c.parent("canvas-container");
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
+  // FIX: Add strokeCap(ROUND) here to make line segments connect smoothly
+  strokeCap(ROUND); 
   updateAllParams();
   resetSpirographs();
 }
@@ -69,33 +71,25 @@ function draw() {
   }
 
   // 2. Redraw Background and Path
-  // Apply a low opacity background for the trail effect, unless trailLength is 0
   const bgAlpha = params.trailLength > 0 ? 5 : 100;
   background(params.baseHue, 80, 10, bgAlpha); 
   
-  // Update theta for animation speed
-  theta += params.animSpeed; 
+  // FIX: Ensure animSpeed is always at least 0.001 to guarantee movement
+  theta += max(0.001, params.animSpeed); 
   
   // Recalculate and draw the current frame
   drawSpirograph();
 
   // 3. Handle Flash Effect during Shuffle (FIXED LOGIC)
   if (params.flash > 0) {
-    // We are already inside the drawing space translated to the center (width/2, height/2)
     push(); 
-
     noStroke();
-    // Fill with white (0, 0, 100) and use params.flash for alpha (0-100)
     fill(0, 0, 100, params.flash); 
-    
-    // Draw the rectangle centered at (0, 0) of the *translated* coordinate system
     rectMode(CENTER);
     rect(0, 0, width, height); 
-    
     pop(); 
   }
 }
-
 // =================================================================
 // PARAMETER/THEME LOGIC
 // =================================================================
@@ -221,6 +215,10 @@ function shuffleTheme() {
 // GEOMETRY MATH (Spirographs)
 // =================================================================
 
+// =================================================================
+// GEOMETRY MATH (Spirographs)
+// =================================================================
+
 function getPolarCoordinate(theta, layer) {
   // Helper to calculate the current coordinate based on curve type and parameters
   
@@ -244,11 +242,10 @@ function getPolarCoordinate(theta, layer) {
   // Directional Factor logic (Applies to the time-based angle, theta)
   let directionalFactor = 1;
   if (params.reverseLayers) {
-      // If 'Reverse Alternate Layers' is checked, alternate the base angle's sign
       directionalFactor = (layer % 2 === 0) ? 1 : -1;
   }
   
-  // FIX for Reverse Alternate Layers: Reverse rotational offset for reversed layers
+  // Reverse rotational offset for reversed layers
   if (directionalFactor === -1 && (params.layerOffsetMode === "rotation" || params.layerOffsetMode === "phase")) {
     tOffset *= -1;
   }
@@ -261,38 +258,33 @@ function getPolarCoordinate(theta, layer) {
   switch (curveType) {
     case "hypotrochoid":
     case "epitrochoid":
-        const R_base = params.outerRadius + rOffset;
+        // 1. Base Radii
+        const r_ = params.innerRadius; 
         const d = params.centerSize;
         
-        let R = R_base;
-        let r_ = params.innerRadius; 
+        // 2. Apply Layer Offset to R (Outer Radius)
+        let R = params.outerRadius + rOffset;
 
-        // FIX 1: Inject numPoints (N) to override the R/r_ ratio and force a clean N-point shape.
-        const N = max(1, params.numPoints);
-        if (N > 1) {
-            if (curveType === "hypotrochoid") {
-                // Hypotrochoid: R/r_ = N/(N-1) => r_ = R * (N-1)/N
-                r_ = R_base * ((N - 1) / N); 
-            } else { // epitrochoid
-                // Epitrochoid: R/r_ = N/(N+1) => r_ = R * (N+1)/N
-                r_ = R_base * ((N + 1) / N);
-            }
-        } 
-        
+        // --- FINAL, ROBUST FIX: Prevents Hypotrochoid from collapsing to a single point. ---
+        // Collapse occurs when R == r_ (R/r_ = 1), causing the rotation factor (k-1) to be 0.
+        if (curveType === "hypotrochoid" && abs(R - r_) < 0.01) {
+            // Force R to be 1% larger than r_ to guarantee a non-zero rotation factor (k-1 = 0.01).
+            R = r_ * 1.01; 
+        }
+        // --- END FIX ---
+
         const k = R / r_; // Ratio R/r_
 
-        // FIX 2: Correct the angular frequency based on the curve's type.
-        // This ensures the animation is fast enough to draw a pattern quickly, 
-        // fixing the "single point" issue caused by a nearly infinite period.
+        // Correct angular frequency based on the curve's type: k-1 (hypo) or k+1 (epi)
         const rotationFactor = curveType === "hypotrochoid" ? (k - 1) : (k + 1);
         const secondAngle = currentTheta * rotationFactor;
 
         if (curveType === "hypotrochoid") {
-            // Standard Hypotrochoid: x = (R-r)cos(t) + d*cos((k-1)t), y = (R-r)sin(t) - d*sin((k-1)t)
+            // Hypotrochoid: x = (R-r)cos(t) + d*cos((k-1)t), y = (R-r)sin(t) - d*sin((k-1)t)
             x = (R - r_) * cos(currentTheta) + d * cos(secondAngle);
             y = (R - r_) * sin(currentTheta) - d * sin(secondAngle);
         } else { // Epitrochoid
-            // Standard Epitrochoid: x = (R+r)cos(t) - d*cos((k+1)t), y = (R+r)sin(t) - d*sin((k+1)t)
+            // Epitrochoid: x = (R+r)cos(t) - d*cos((k+1)t), y = (R+r)sin(t) - d*sin((k+1)t)
             x = (R + r_) * cos(currentTheta) - d * cos(secondAngle);
             y = (R + r_) * sin(currentTheta) - d * sin(secondAngle);
         }
@@ -313,7 +305,6 @@ function getPolarCoordinate(theta, layer) {
         const ampY = params.innerRadius;
         const phase = params.layerOffsetAmount * PI; // Use offset for phase
         
-        // currentTheta already includes the directionalFactor and offset
         x = ampX * sin(freqX * currentTheta + phase);
         y = ampY * cos(freqY * currentTheta);
         break;
@@ -321,15 +312,11 @@ function getPolarCoordinate(theta, layer) {
     case "superformula":
         // Simplified Superformula
         const m = params.numPoints;
-        
-        // FIX: Set n1, n2, and n3 to 1.0 to prevent the radius from collapsing when m (numPoints) is large
         const n1 = 1.0; 
         const n2 = 1.0; 
         const n3 = 1.0; 
-        
         const a = 1;
         const b = 1;
-        
         const phi = currentTheta;
         const t1 = (abs(cos(m * phi / 4) / a) ** n2);
         const t2 = (abs(sin(m * phi / 4) / b) ** n3);
@@ -346,7 +333,6 @@ function getPolarCoordinate(theta, layer) {
         const phase2 = params.layerOffsetAmount * HALF_PI;
         const damp = 0.9999;
         
-        // currentTheta already includes the directionalFactor and offset
         x = (params.outerRadius + rOffset) * cos(freq1 * currentTheta + phase1) * (damp ** currentTheta);
         y = (params.innerRadius) * sin(freq2 * currentTheta + phase2) * (damp ** currentTheta);
         break;
@@ -388,8 +374,7 @@ function drawSpirograph() {
   for (let i = 0; i < params.numLayers; i++) {
     const layer = spirographs[i];
     
-    // Use beginShape/endShape for continuous line drawing
-    beginShape();
+    // FIX: begnShape()/endShape() removed to allow individual line segment styling
     for (let j = 0; j < layer.length; j++) {
       const p = layer[j];
       const t = j / layer.length; // Normalized position along the trail
@@ -415,10 +400,9 @@ function drawSpirograph() {
       // Draw the line segment
       if (j > 0) {
           const pPrev = layer[j - 1];
-          line(pPrev.x, pPrev.y, p.x, p,y);
+          line(pPrev.x, pPrev.y, p.x, p.y); 
       }
     }
-    endShape();
   }
 }
 
