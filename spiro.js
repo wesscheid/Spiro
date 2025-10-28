@@ -5,9 +5,6 @@ let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
 
-// The definitive list of parameters that can be smoothly transitioned without a hard reset.
-const AESTHETIC_PARAMS = ['animSpeed', 'trailLength', 'lineWeight', 'lineThinning', 'baseHue', 'colorSpread', 'scale']; 
-
 function getCanvasSize() {
   const controls = document.getElementById("controls");
   const rect = controls?.getBoundingClientRect() || { width: 300, height: 300 };
@@ -23,8 +20,6 @@ function setup() {
   c.parent("canvas-container");
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
-  // FIX: Add strokeCap(ROUND) here to make line segments connect smoothly
-  strokeCap(ROUND); 
   updateAllParams();
   resetSpirographs();
 }
@@ -38,393 +33,211 @@ function windowResized() {
 function resetSpirographs() {
   spirographs = [];
   theta = 0;
-  // Use the current theme's baseHue for a full, opaque background wipe
-  const bgHue = params.baseHue !== undefined ? params.baseHue : 290;
-  background(bgHue, 80, 10);
+  background(290, 80, 10);
 }
-
-// =================================================================
-// PRIMARY DRAW LOOP LOGIC
-// =================================================================
 
 function draw() {
   if (!params || Object.keys(params).length === 0) return;
 
-  // 1. Handle Transitions (Theme Shuffle OR Single Parameter Change)
   if (themeTransition) {
     const t = constrain((millis() - themeTransition.start) / themeTransition.duration, 0, 1);
-    
-    // Smoothly apply values for all parameters in the transition object
-    for (const key in themeTransition.to) {
-      if (typeof themeTransition.from[key] === 'number') {
-        params[key] = lerp(themeTransition.from[key], themeTransition.to[key], t);
+    for (let key in themeTransition.to) {
+      const fromVal = themeTransition.from[key];
+      const toVal = themeTransition.to[key];
+      if (typeof toVal === "number") {
+        params[key] = lerp(fromVal, toVal, t);
       } else {
-        // Non-numeric values (like curveType) are set only when transition starts or ends
-        params[key] = themeTransition.to[key];
+        params[key] = t < 0.5 ? fromVal : toVal;
       }
     }
+    if (t >= 1) themeTransition = null;
+  }
 
-    // End transition if time is up
-    if (t === 1) {
-      themeTransition = null;
+  fill(290, 80, 10, constrain(100 - params.trailLength / 20, 2, 95));
+  noStroke();
+  rect(0, 0, width, height);
+
+  push();
+  translate(width / 2, height / 2);
+  scale(params.scale);
+  let drift = radians(0.01 * frameCount);
+
+  for (let i = 0; i < params.numPoints; i++) {
+    push();
+    rotate((i * TWO_PI) / params.numPoints + drift);
+    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l);
+    pop();
+  }
+  pop();
+
+  theta += params.animSpeed;
+}
+
+function drawCurve(index, layer) {
+  let outerRadius = params.outerRadius;
+  let innerRadius = params.innerRadius;
+  let centerSize = params.centerSize;
+  let currentTheta = theta;
+
+  innerRadius += 20 * sin(frameCount * 0.002 + layer * 0.4);
+  centerSize += 15 * cos(frameCount * 0.0015 + layer * 0.6);
+
+  if (params.layerOffsetMode === "radius") outerRadius *= 1 + layer * params.layerOffsetAmount;
+  else if (params.layerOffsetMode === "rotation") currentTheta += layer * params.layerOffsetAmount;
+  else if (params.layerOffsetMode === "phase") currentTheta += layer * PI * params.layerOffsetAmount;
+
+  if (params.reverseLayers && layer % 2 === 1) currentTheta *= -1;
+
+  const c1 = computeCurve(params.curveType, currentTheta, outerRadius, innerRadius, centerSize);
+  let x = c1.x, y = c1.y;
+
+  if (params.dualCurveMode) {
+    const c2 = computeCurve(params.secondaryCurve, currentTheta, outerRadius * 0.8, innerRadius * 0.8, centerSize * 0.8);
+    if (params.dualModeType === "blend") {
+      const t = sin(frameCount * 0.002) * 0.5 + 0.5;
+      x = lerp(c1.x, c2.x, t);
+      y = lerp(c1.y, c2.y, t);
+    } else if (params.dualModeType === "combine") {
+      x = c1.x + c2.x;
+      y = c1.y + c2.y;
+    } else if (params.dualModeType === "alternate" && layer % 2 === 1) {
+      x = c2.x;
+      y = c2.y;
     }
   }
 
-  // 2. Redraw Background and Path
-  const bgAlpha = params.trailLength > 0 ? 5 : 100;
-  background(params.baseHue, 80, 10, bgAlpha); 
-  
-  // FIX: Ensure animSpeed is always at least 0.001 to guarantee movement
-  theta += max(0.001, params.animSpeed); 
-  
-  // Recalculate and draw the current frame
-  drawSpirograph();
+  if (!spirographs[index]) spirographs[index] = [];
+  if (!spirographs[index][layer]) spirographs[index][layer] = [];
+  const arr = spirographs[index][layer];
+  arr.push({ x, y });
+  while (arr.length > params.trailLength) arr.shift();
 
-  // 3. Handle Flash Effect during Shuffle (FIXED LOGIC)
-  if (params.flash > 0) {
-    push(); 
-    noStroke();
-    fill(0, 0, 100, params.flash); 
-    rectMode(CENTER);
-    rect(0, 0, width, height); 
-    pop(); 
+  if (arr.length > 1) {
+    let hue = (params.baseHue + (index * params.colorSpread / params.numPoints) + layer * 40) % 360;
+    for (let j = 1; j < arr.length; j++) {
+      const prev = arr[j - 1], curr = arr[j];
+      const factor = j / arr.length;
+      stroke(hue, 70, 95, 20 + 65 * factor);
+      strokeWeight(max(0.05, params.lineWeight * (1 - params.lineThinning * (1 - factor))));
+      line(prev.x, prev.y, curr.x, curr.y);
+    }
   }
 }
-// =================================================================
-// PARAMETER/THEME LOGIC
-// =================================================================
 
-// Function to initiate a smooth transition for a single slider change
-function startParameterTransition(paramName, newValue, duration = 300) {
-  // Base the 'from' state on the current, live 'params' object
-  const from = { ...params };
-  const to = { ...params };
-  
-  // Set the new target value for the specific parameter
-  to[paramName] = newValue;
-
-  // Initiate the new, partial transition
-  themeTransition = {
-    from: from,
-    to: to,
-    start: millis(),
-    duration: duration
-  };
+function computeCurve(type, t, outer, inner, center) {
+  let x = 0, y = 0;
+  if (type === "hypotrochoid") {
+    x = (outer - inner) * cos(t) + center * cos(((outer - inner) / inner) * t);
+    y = (outer - inner) * sin(t) - center * sin(((outer - inner) / inner) * t);
+  } else if (type === "epitrochoid") {
+    x = (outer + inner) * cos(t) - center * cos(((outer + inner) / inner) * t);
+    y = (outer + inner) * sin(t) - center * sin(((outer + inner) / inner) * t);
+  } else if (type === "rose") {
+    let k = inner / outer;
+    let r = outer * cos(k * t);
+    x = r * cos(t);
+    y = r * sin(t);
+  } else if (type === "lissajous") {
+    let a = max(1, int(outer / 20)), b = max(1, int(inner / 20)), delta = center * 0.01;
+    x = outer * sin(a * t + delta);
+    y = inner * sin(b * t);
+  } else if (type === "superformula") {
+    let m = 6, n1 = 0.3, n2 = 1.7, n3 = 1.7, a = 1, b = 1;
+    let part1 = pow(abs(cos((m * t) / 4) / a), n2);
+    let part2 = pow(abs(sin((m * t) / 4) / b), n3);
+    let denom = pow(part1 + part2, 1 / n1);
+    let r = denom === 0 ? 0 : 1.0 / denom;
+    x = outer * r * cos(t);
+    y = outer * r * sin(t);
+  } else if (type === "harmonograph") {
+    let scaledT = t * 0.02;
+    let A = outer * 0.5, B = inner * 0.5;
+    let f1 = 2.0, f2 = 3.0, d1 = 0.0006, d2 = 0.0008;
+    x = A * sin(f1 * scaledT + 0.5) * exp(-d1 * scaledT);
+    y = B * sin(f2 * scaledT) * exp(-d2 * scaledT);
+  }
+  return { x, y };
 }
 
 function updateAllParams() {
-  // Reads ALL parameter values from the DOM and updates the 'params' object
-  
-  // Primary Curve
-  params.curveType = document.getElementById('curveType').value;
-  params.outerRadius = parseFloat(document.getElementById('outerRadius').value);
-  params.innerRadius = parseFloat(document.getElementById('innerRadius').value);
-  params.centerSize = parseFloat(document.getElementById('centerSize').value);
-  params.numPoints = parseInt(document.getElementById('numPoints').value);
+  const get = id => document.getElementById(id);
+  params.curveType = get("curveType")?.value || "hypotrochoid";
+  params.dualCurveMode = get("dualCurveMode")?.checked || false;
+  params.secondaryCurve = get("secondaryCurve")?.value || params.curveType;
+  params.dualModeType = get("dualModeType")?.value || "blend";
 
-  // Dual Curve
-  params.dualCurveMode = document.getElementById('dualCurveMode').checked;
-  params.secondaryCurve = document.getElementById('secondaryCurve').value;
-  params.dualModeType = document.getElementById('dualModeType').value;
-  
-  // Layers
-  params.numLayers = parseInt(document.getElementById('numLayers').value);
-  params.layerOffsetMode = document.getElementById('layerOffsetMode').value;
-  params.layerOffsetAmount = parseFloat(document.getElementById('layerOffsetAmount').value);
-  params.reverseLayers = document.getElementById('reverseLayers').checked;
+  params.outerRadius = parseFloat(get("outerRadius")?.value || 180);
+  params.innerRadius = parseFloat(get("innerRadius")?.value || 80);
+  params.centerSize = parseFloat(get("centerSize")?.value || 60);
+  params.numPoints = parseInt(get("numPoints")?.value || 12, 10);
+  params.scale = parseFloat(get("scale")?.value || 1.0);
+  params.numLayers = parseInt(get("numLayers")?.value || 2, 10);
+  params.layerOffsetMode = get("layerOffsetMode")?.value || "radius";
+  params.layerOffsetAmount = parseFloat(get("layerOffsetAmount")?.value || 0.06);
+  params.reverseLayers = get("reverseLayers")?.checked || false;
 
-  // Aesthetics & Motion
-  params.scale = parseFloat(document.getElementById('scale').value);
-  params.animSpeed = parseFloat(document.getElementById('animSpeed').value);
-  params.trailLength = parseInt(document.getElementById('trailLength').value);
-  params.lineWeight = parseFloat(document.getElementById('lineWeight').value);
-  params.lineThinning = parseFloat(document.getElementById('lineThinning').value);
-  params.baseHue = parseFloat(document.getElementById('baseHue').value);
-  params.colorSpread = parseFloat(document.getElementById('colorSpread').value);
-
-  // Initialize the new 'flash' parameter to ensure it exists on the 'params' object at load.
-  params.flash = 0; 
+  params.animSpeed = parseFloat(get("animSpeed")?.value || 0.02);
+  params.trailLength = parseInt(get("trailLength")?.value || 120, 10);
+  params.lineWeight = parseFloat(get("lineWeight")?.value || 1.6);
+  params.lineThinning = parseFloat(get("lineThinning")?.value || 0.7);
+  params.baseHue = parseFloat(get("baseHue")?.value || 260);
+  params.colorSpread = parseFloat(get("colorSpread")?.value || 120);
 }
 
-// =================================================================
-// SHUFFLE THEME FUNCTION (Fully Fixed)
-// =================================================================
-
 function shuffleTheme() {
-  if (!Array.isArray(window.themes) || window.themes.length === 0) return;
+  if (!Array.isArray(window.themes) || themes.length === 0) return;
+  const choice = themes[Math.floor(Math.random() * themes.length)];
 
-  const choice = window.themes[Math.floor(Math.random() * window.themes.length)];
-
-  // 1. HARD RESET CORE LOGIC
-  // Clear the old, incompatible trail data and reset the drawing phase immediately.
-  spirographs = []; 
-  theta = 0;
-  
-  // 2. FIX: IMMEDIATELY APPLY ALL GEOMETRIC/STRUCTURAL PARAMETERS
-  // These parameters MUST snap immediately for the new curve to start drawing.
-  params.curveType = choice.curveType || "hypotrochoid";
-  params.dualCurveMode = !!choice.dual;
-  params.secondaryCurve = choice.secondary || "hypotrochoid";
-  params.dualModeType = choice.dualMode || "blend";
-  
-  params.outerRadius = choice.outer ?? 180;
-  params.innerRadius = choice.inner ?? 80;
-  params.centerSize = choice.center ?? 60;
-  params.numPoints = choice.points ?? 12;
-  params.numLayers = choice.layers ?? 2;
-  
-  params.layerOffsetMode = choice.offset || "radius";
-  params.layerOffsetAmount = choice.offsetAmount ?? 0.06;
-  params.reverseLayers = !!choice.reverse;
-  
-  // 3. HARD CLEAR & BASE HUE SNAP
-  // Apply the new background hue (and base color) immediately.
-  const newHue = choice.hue ?? 260; 
-  background(newHue, 80, 10);
-  params.baseHue = newHue; // Ensures points start drawing with the right color
-  
-  // 4. INITIATE TRANSITION (ONLY for Aesthetics & Flash)
-  // Only the aesthetic, color spread, and speed variables need to transition smoothly.
   themeTransition = {
-    from: { 
-      // Only include aesthetic and flash properties in the transition
-      animSpeed: params.animSpeed,
-      trailLength: params.trailLength,
-      lineWeight: params.lineWeight,
-      lineThinning: params.lineThinning,
-      colorSpread: params.colorSpread,
-      scale: params.scale, // Scale can transition smoothly
-      flash: 70 // Softened Flash starts at 70% opacity
-    },
+    from: { ...params },
     to: {
+      curveType: choice.curveType || "hypotrochoid",
+      dualCurveMode: !!choice.dual,
+      secondaryCurve: choice.secondary || "hypotrochoid",
+      dualModeType: choice.dualMode || "blend",
+      outerRadius: choice.outer ?? 180,
+      innerRadius: choice.inner ?? 80,
+      centerSize: choice.center ?? 60,
+      numPoints: choice.points ?? 12,
+      scale: choice.scale ?? 1.0,
+      numLayers: choice.layers ?? 2,
+      layerOffsetMode: choice.offset || "radius",
+      layerOffsetAmount: choice.offsetAmount ?? 0.06,
+      reverseLayers: !!choice.reverse,
       animSpeed: choice.speed ?? 0.02,
       trailLength: choice.trail ?? 120,
       lineWeight: choice.lineWeight ?? 1.6,
       lineThinning: choice.lineThinning ?? 0.7,
-      colorSpread: choice.spread ?? 120,
-      scale: choice.scale ?? 1.0,
-      flash: 0 // Flash ends fully transparent
+      baseHue: choice.hue ?? 260,
+      colorSpread: choice.spread ?? 120
     },
     start: millis(),
-    duration: 250 
+    duration: 250
   };
 }
 
-
-// =================================================================
-// GEOMETRY MATH (Spirographs)
-// =================================================================
-
-// =================================================================
-// GEOMETRY MATH (Spirographs)
-// =================================================================
-
-function getPolarCoordinate(theta, layer) {
-  // Helper to calculate the current coordinate based on curve type and parameters
-  
-  let curveType = layer % 2 === 0 ? params.curveType : params.secondaryCurve;
-  if (!params.dualCurveMode) curveType = params.curveType;
-  
-  // Logic for layer offsets
-  let rOffset = 0;
-  let tOffset = 0;
-  
-  if (params.numLayers > 1) {
-      if (params.layerOffsetMode === "radius") {
-          rOffset = layer * params.layerOffsetAmount * params.outerRadius;
-      } else if (params.layerOffsetMode === "rotation") {
-          tOffset = layer * params.layerOffsetAmount * TWO_PI;
-      } else if (params.layerOffsetMode === "phase") {
-          tOffset = layer * params.layerOffsetAmount * HALF_PI;
-      }
-  }
-
-  // Directional Factor logic (Applies to the time-based angle, theta)
-  let directionalFactor = 1;
-  if (params.reverseLayers) {
-      directionalFactor = (layer % 2 === 0) ? 1 : -1;
-  }
-  
-  // Reverse rotational offset for reversed layers
-  if (directionalFactor === -1 && (params.layerOffsetMode === "rotation" || params.layerOffsetMode === "phase")) {
-    tOffset *= -1;
-  }
-  
-  // Apply the directional factor to the base angle (theta) and add the static layer offset (tOffset)
-  const currentTheta = (theta * directionalFactor) + tOffset;
-
-  let x, y, r;
-
-  switch (curveType) {
-    case "hypotrochoid":
-    case "epitrochoid":
-        // 1. Base Radii
-        const r_ = params.innerRadius; 
-        const d = params.centerSize;
-        
-        // 2. Apply Layer Offset to R (Outer Radius)
-        let R = params.outerRadius + rOffset;
-
-        // --- FINAL, ROBUST FIX: Prevents Hypotrochoid from collapsing to a single point. ---
-        // Collapse occurs when R == r_ (R/r_ = 1), causing the rotation factor (k-1) to be 0.
-        if (curveType === "hypotrochoid" && abs(R - r_) < 0.01) {
-            // Force R to be 1% larger than r_ to guarantee a non-zero rotation factor (k-1 = 0.01).
-            R = r_ * 1.01; 
-        }
-        // --- END FIX ---
-
-        const k = R / r_; // Ratio R/r_
-
-        // Correct angular frequency based on the curve's type: k-1 (hypo) or k+1 (epi)
-        const rotationFactor = curveType === "hypotrochoid" ? (k - 1) : (k + 1);
-        const secondAngle = currentTheta * rotationFactor;
-
-        if (curveType === "hypotrochoid") {
-            // Hypotrochoid: x = (R-r)cos(t) + d*cos((k-1)t), y = (R-r)sin(t) - d*sin((k-1)t)
-            x = (R - r_) * cos(currentTheta) + d * cos(secondAngle);
-            y = (R - r_) * sin(currentTheta) - d * sin(secondAngle);
-        } else { // Epitrochoid
-            // Epitrochoid: x = (R+r)cos(t) - d*cos((k+1)t), y = (R+r)sin(t) - d*sin((k+1)t)
-            x = (R + r_) * cos(currentTheta) - d * cos(secondAngle);
-            y = (R + r_) * sin(currentTheta) - d * sin(secondAngle);
-        }
-        break;
-
-    case "rose":
-        const n = params.numPoints;
-        const D = params.outerRadius + rOffset;
-        r = D * cos(n * currentTheta);
-        x = r * cos(currentTheta);
-        y = r * sin(currentTheta);
-        break;
-
-    case "lissajous":
-        const freqX = params.numPoints / 2; // Simple conversion for control
-        const freqY = params.numPoints / 3;
-        const ampX = params.outerRadius + rOffset;
-        const ampY = params.innerRadius;
-        const phase = params.layerOffsetAmount * PI; // Use offset for phase
-        
-        x = ampX * sin(freqX * currentTheta + phase);
-        y = ampY * cos(freqY * currentTheta);
-        break;
-
-    case "superformula":
-        // Simplified Superformula
-        const m = params.numPoints;
-        const n1 = 1.0; 
-        const n2 = 1.0; 
-        const n3 = 1.0; 
-        const a = 1;
-        const b = 1;
-        const phi = currentTheta;
-        const t1 = (abs(cos(m * phi / 4) / a) ** n2);
-        const t2 = (abs(sin(m * phi / 4) / b) ** n3);
-        r = (params.outerRadius + rOffset) / ((t1 + t2) ** (1 / n1));
-        
-        x = r * cos(phi);
-        y = r * sin(phi);
-        break;
-        
-    case "harmonograph":
-        const freq1 = params.numPoints;
-        const freq2 = params.numPoints * 0.99;
-        const phase1 = params.layerOffsetAmount * PI;
-        const phase2 = params.layerOffsetAmount * HALF_PI;
-        const damp = 0.9999;
-        
-        x = (params.outerRadius + rOffset) * cos(freq1 * currentTheta + phase1) * (damp ** currentTheta);
-        y = (params.innerRadius) * sin(freq2 * currentTheta + phase2) * (damp ** currentTheta);
-        break;
-        
-    default:
-      x = 0; y = 0; // Fallback
-  }
-
-  // Apply overall scale
-  return createVector(x * params.scale, y * params.scale);
-}
-
-function drawSpirograph() {
-  noFill();
-  translate(width / 2, height / 2);
-
-  // If we are at the beginning of a drawing, initialize the spirographs array
-  if (spirographs.length === 0) {
-      for(let i = 0; i < params.numLayers; i++) {
-          spirographs.push([]);
-      }
-  }
-
-  // Get new point for each layer
-  for (let i = 0; i < params.numLayers; i++) {
-    const point = getPolarCoordinate(theta, i);
-    spirographs[i].push(point);
-  }
-
-  // Trim trail length
-  const maxLen = params.trailLength;
-  for (let i = 0; i < params.numLayers; i++) {
-    if (spirographs[i].length > maxLen) {
-      spirographs[i].shift();
-    }
-  }
-
-  // Draw all layers
-  for (let i = 0; i < params.numLayers; i++) {
-    const layer = spirographs[i];
-    
-    // FIX: begnShape()/endShape() removed to allow individual line segment styling
-    for (let j = 0; j < layer.length; j++) {
-      const p = layer[j];
-      const t = j / layer.length; // Normalized position along the trail
-
-      // This logic ensures the color trail also flows in the reversed direction
-      let colorFactor = 1;
-      if (params.reverseLayers) {
-          // If 'Reverse Alternate Layers' is checked, alternate direction for the color spread
-          colorFactor = (i % 2 === 0) ? 1 : -1;
-      }
-      
-      // Calculate hue and alpha
-      const hue = (params.baseHue + (t * params.colorSpread * colorFactor) + (i * 360 / params.numLayers)) % 360;
-      const alpha = map(t, 0, 1, 30, 100);
-
-      // Calculate weight with thinning effect
-      const weight = map(t, 0, 1, params.lineWeight * params.lineThinning, params.lineWeight);
-
-      // Set stroke for the segment
-      stroke(hue, 80, 95, alpha);
-      strokeWeight(weight);
-      
-      // Draw the line segment
-      if (j > 0) {
-          const pPrev = layer[j - 1];
-          line(pPrev.x, pPrev.y, p.x, p.y); 
-      }
-    }
-  }
-}
-
-// =================================================================
-// UI INITIALIZATION AND EVENT LISTENERS
-// =================================================================
-
 function toggleFullscreenCanvas() {
+  const container = document.getElementById("canvas-container");
+  const controls = document.getElementById("controls");
+
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(err => {
-      console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+    container?.requestFullscreen().then(() => {
+      fullscreenMode = true;
+      if (controls) controls.style.display = "none";
+      const { w, h } = getCanvasSize();
+      resizeCanvas(w, h);
+      resetSpirographs();
     });
   } else {
-    document.exitFullscreen();
+    document.exitFullscreen().then(() => {
+      fullscreenMode = false;
+      if (controls) controls.style.display = "block";
+      const { w, h } = getCanvasSize();
+      resizeCanvas(w, h);
+      resetSpirographs();
+    });
   }
 }
-
-window.addEventListener("resize", () => {
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  resetSpirographs();
-});
 
 document.addEventListener("fullscreenchange", () => {
   const controls = document.getElementById("controls");
@@ -438,40 +251,22 @@ document.addEventListener("fullscreenchange", () => {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
-  
-  // =================================================================
-  // MODIFIED SLIDER EVENT LISTENER (Handles Smooth/Hard Resets)
-  // =================================================================
+
   document.querySelectorAll("input[type=range]").forEach(input => {
     const display = document.getElementById(input.id + "-value");
-    
-    // Initial display value
     if (display) {
       display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
     }
-    
     input.addEventListener("input", () => {
-      // Update display value
       const display = document.getElementById(input.id + "-value");
       if (display) {
         display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
       }
-      
-      const paramName = input.id;
-      const newValue = parseFloat(input.value);
-      
-      if (AESTHETIC_PARAMS.includes(paramName)) {
-          // Soft Transition for aesthetic parameters
-          startParameterTransition(paramName, newValue, 300); // 300ms transition
-      } else {
-          // Hard Reset for geometry-altering parameters
-          updateAllParams();
-          resetSpirographs();
-      }
+      updateAllParams();
+      resetSpirographs();
     });
   });
 
-  // Keep the select/checkbox listeners for hard reset (geometry/logic changes)
   document.querySelectorAll("select, input[type=checkbox]").forEach(el => {
     el.addEventListener("change", () => {
       updateAllParams();
@@ -480,4 +275,5 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   updateAllParams();
+  resetSpirographs();
 });
