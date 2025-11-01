@@ -4,6 +4,8 @@ let theta = 0;
 let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
+let fadeState = "none"; // "none", "fading-out", "fading-in"
+let fadeAlpha = 0;
 
 function getCanvasSize() {
   const controls = document.getElementById("controls");
@@ -20,8 +22,44 @@ function setup() {
   c.parent("canvas-container");
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
-  updateAllParams();
+
+  document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
+  document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
+
+  const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "autoScale", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
+  const styleParams = ["animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread"];
+
+  shapeParams.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", () => {
+        updateShapeParams();
+        resetSpirographs();
+        const display = document.getElementById(id + "-value");
+        if (display) {
+          display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
+        }
+      });
+    }
+  });
+
+  styleParams.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", () => {
+        updateStyleParams();
+        const display = document.getElementById(id + "-value");
+        if (display) {
+          display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
+        }
+      });
+    }
+  });
+
+  updateShapeParams();
+  updateStyleParams();
   resetSpirographs();
+  updateParameterVisibility(params.curveType);
 }
 
 function windowResized() {
@@ -37,6 +75,43 @@ function resetSpirographs() {
 }
 
 function draw() {
+  if (fadeState === "fading-out") {
+    fadeAlpha = min(fadeAlpha + 10, 255);
+    background(290, 80, 10, fadeAlpha);
+    if (fadeAlpha === 255) {
+      resetSpirographs();
+      const choice = nextTheme;
+      themeTransition = {
+        from: { ...params },
+        to: {
+          curveType: choice.curveType || "hypotrochoid",
+          dualCurveMode: !!choice.dual,
+          secondaryCurve: choice.secondary || "hypotrochoid",
+          dualModeType: choice.dualMode || "blend",
+          outerRadius: choice.outer ?? 180,
+          innerRadius: choice.inner ?? 80,
+          centerSize: choice.center ?? 60,
+          numPoints: choice.points ?? 12,
+          scale: choice.scale ?? 1.0,
+          numLayers: choice.layers ?? 2,
+          layerOffsetMode: choice.offset || "radius",
+          layerOffsetAmount: choice.offsetAmount ?? 0.06,
+          reverseLayers: !!choice.reverse,
+          animSpeed: choice.speed ?? 0.02,
+          trailLength: choice.trail ?? 120,
+          lineWeight: choice.lineWeight ?? 1.6,
+          lineThinning: choice.lineThinning ?? 0.7,
+          baseHue: choice.hue ?? 260,
+          colorSpread: choice.spread ?? 120
+        },
+        start: millis(),
+        duration: 250
+      };
+      fadeState = "fading-in";
+    }
+    return;
+  }
+
   if (!params || Object.keys(params).length === 0) return;
 
   if (themeTransition) {
@@ -50,7 +125,10 @@ function draw() {
         params[key] = t < 0.5 ? fromVal : toVal;
       }
     }
-    if (t >= 1) themeTransition = null;
+    if (t >= 1) {
+      themeTransition = null;
+      updateUIFromParams();
+    }
   }
 
   fill(290, 80, 10, constrain(100 - params.trailLength / 20, 2, 95));
@@ -71,6 +149,19 @@ function draw() {
   pop();
 
   theta += params.animSpeed;
+
+  if (fadeState === "fading-in") {
+    fadeAlpha = max(fadeAlpha - 10, 0);
+    background(290, 80, 10, fadeAlpha);
+    if (fadeAlpha === 0) {
+      fadeState = "none";
+    }
+  }
+
+  fill(255);
+  textSize(12);
+  textAlign(LEFT, BOTTOM);
+  text(currentThemeName, 10, height - 10);
 }
 
 function drawCurve(index, layer) {
@@ -142,7 +233,7 @@ function computeCurve(type, t, outer, inner, center) {
     x = outer * sin(a * t + delta);
     y = inner * sin(b * t);
   } else if (type === "superformula") {
-    let m = 6, n1 = 0.3, n2 = 1.7, n3 = 1.7, a = 1, b = 1;
+    let m = params.m, n1 = params.n1, n2 = params.n2, n3 = params.n3, a = 1, b = 1;
     let part1 = pow(abs(cos((m * t) / 4) / a), n2);
     let part2 = pow(abs(sin((m * t) / 4) / b), n3);
     let denom = pow(part1 + part2, 1 / n1);
@@ -152,14 +243,34 @@ function computeCurve(type, t, outer, inner, center) {
   } else if (type === "harmonograph") {
     let scaledT = t * 0.02;
     let A = outer * 0.5, B = inner * 0.5;
-    let f1 = 2.0, f2 = 3.0, d1 = 0.0006, d2 = 0.0008;
+    let f1 = params.f1, f2 = params.f2, d1 = params.d1, d2 = params.d2;
     x = A * sin(f1 * scaledT + 0.5) * exp(-d1 * scaledT);
     y = B * sin(f2 * scaledT) * exp(-d2 * scaledT);
+  } else if (type === "hypocycloid") {
+    x = (outer - inner) * cos(t) + inner * cos(((outer - inner) / inner) * t);
+    y = (outer - inner) * sin(t) - inner * sin(((outer - inner) / inner) * t);
+  } else if (type === "epicycloid") {
+    x = (outer + inner) * cos(t) - inner * cos(((outer + inner) / inner) * t);
+    y = (outer + inner) * sin(t) - inner * sin(((outer + inner) / inner) * t);
+  } else if (type === "cycloid") {
+    x = inner * (t - sin(t));
+    y = inner * (1 - cos(t));
+  } else if (type === "trochoid") {
+    x = inner * t - center * sin(t);
+    y = inner - center * cos(t);
+  } else if (type === "limacon") {
+    let r = outer + inner * cos(t);
+    x = r * cos(t);
+    y = r * sin(t);
+  } else if (type === "ellipse") {
+    x = outer * cos(t);
+    y = inner * sin(t);
   }
   return { x, y };
 }
 
-function updateAllParams() {
+function updateShapeParams() {
+  currentThemeName = "Custom";
   const get = id => document.getElementById(id);
   params.curveType = get("curveType")?.value || "hypotrochoid";
   params.dualCurveMode = get("dualCurveMode")?.checked || false;
@@ -176,6 +287,26 @@ function updateAllParams() {
   params.layerOffsetAmount = parseFloat(get("layerOffsetAmount")?.value || 0.06);
   params.reverseLayers = get("reverseLayers")?.checked || false;
 
+  params.m = parseFloat(get("m")?.value || 6);
+  params.n1 = parseFloat(get("n1")?.value || 0.3);
+  params.n2 = parseFloat(get("n2")?.value || 1.7);
+  params.n3 = parseFloat(get("n3")?.value || 1.7);
+
+  params.f1 = parseFloat(get("f1")?.value || 2);
+  params.f2 = parseFloat(get("f2")?.value || 3);
+  params.d1 = parseFloat(get("d1")?.value || 0.0006);
+  params.d2 = parseFloat(get("d2")?.value || 0.0008);
+
+  if (get("autoScale")?.checked) {
+    autoAdjustScale();
+  }
+
+  updateParameterVisibility(params.curveType);
+}
+
+function updateStyleParams() {
+  currentThemeName = "Custom";
+  const get = id => document.getElementById(id);
   params.animSpeed = parseFloat(get("animSpeed")?.value || 0.02);
   params.trailLength = parseInt(get("trailLength")?.value || 120, 10);
   params.lineWeight = parseFloat(get("lineWeight")?.value || 1.6);
@@ -184,46 +315,133 @@ function updateAllParams() {
   params.colorSpread = parseFloat(get("colorSpread")?.value || 120);
 }
 
-function shuffleTheme() {
-  if (!Array.isArray(window.themes) || themes.length === 0) return;
-  const choice = themes[Math.floor(Math.random() * themes.length)];
+function updateUIFromParams() {
+  const get = id => document.getElementById(id);
+  get("curveType").value = params.curveType;
+  get("dualCurveMode").checked = params.dualCurveMode;
+  get("secondaryCurve").value = params.secondaryCurve;
+  get("dualModeType").value = params.dualModeType;
 
-  themeTransition = {
-    from: { ...params },
-    to: {
-      curveType: choice.curveType || "hypotrochoid",
-      dualCurveMode: !!choice.dual,
-      secondaryCurve: choice.secondary || "hypotrochoid",
-      dualModeType: choice.dualMode || "blend",
-      outerRadius: choice.outer ?? 180,
-      innerRadius: choice.inner ?? 80,
-      centerSize: choice.center ?? 60,
-      numPoints: choice.points ?? 12,
-      scale: choice.scale ?? 1.0,
-      numLayers: choice.layers ?? 2,
-      layerOffsetMode: choice.offset || "radius",
-      layerOffsetAmount: choice.offsetAmount ?? 0.06,
-      reverseLayers: !!choice.reverse,
-      animSpeed: choice.speed ?? 0.02,
-      trailLength: choice.trail ?? 120,
-      lineWeight: choice.lineWeight ?? 1.6,
-      lineThinning: choice.lineThinning ?? 0.7,
-      baseHue: choice.hue ?? 260,
-      colorSpread: choice.spread ?? 120
-    },
-    start: millis(),
-    duration: 250
+  get("outerRadius").value = params.outerRadius;
+  get("innerRadius").value = params.innerRadius;
+  get("centerSize").value = params.centerSize;
+  get("numPoints").value = params.numPoints;
+  get("scale").value = params.scale;
+  get("numLayers").value = params.numLayers;
+  get("layerOffsetMode").value = params.layerOffsetMode;
+  get("layerOffsetAmount").value = params.layerOffsetAmount;
+  get("reverseLayers").checked = params.reverseLayers;
+
+  get("animSpeed").value = params.animSpeed;
+  get("trailLength").value = params.trailLength;
+  get("lineWeight").value = params.lineWeight;
+  get("lineThinning").value = params.lineThinning;
+  get("baseHue").value = params.baseHue;
+  get("colorSpread").value = params.colorSpread;
+
+  document.querySelectorAll("input[type=range]").forEach(input => {
+    const display = document.getElementById(input.id + "-value");
+    if (display) {
+      display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
+    }
+  });
+}
+
+function updateParameterVisibility(curveType) {
+  const controls = {
+    outerRadius: document.getElementById("outerRadius").parentElement,
+    innerRadius: document.getElementById("innerRadius").parentElement,
+    centerSize: document.getElementById("centerSize").parentElement,
+    superformula: document.getElementById("superformula-controls"),
+    harmonograph: document.getElementById("harmonograph-controls")
   };
+
+  const visibility = {
+    hypotrochoid: ["outerRadius", "innerRadius", "centerSize"],
+    epitrochoid: ["outerRadius", "innerRadius", "centerSize"],
+    rose: ["outerRadius", "innerRadius"],
+    lissajous: ["outerRadius", "innerRadius", "centerSize"],
+    superformula: ["outerRadius", "superformula"],
+    harmonograph: ["outerRadius", "innerRadius", "harmonograph"],
+    hypocycloid: ["outerRadius", "innerRadius"],
+    epicycloid: ["outerRadius", "innerRadius"],
+    cycloid: ["innerRadius"],
+    trochoid: ["innerRadius", "centerSize"],
+    limacon: ["outerRadius", "innerRadius"],
+    ellipse: ["outerRadius", "innerRadius"]
+  };
+
+  Object.keys(controls).forEach(key => {
+    if (visibility[curveType] && visibility[curveType].includes(key)) {
+      controls[key].style.display = "block";
+    } else {
+      controls[key].style.display = "none";
+    }
+  });
+}
+
+function autoAdjustScale() {
+  let maxRadius = 0;
+  const { curveType, outerRadius, innerRadius, centerSize } = params;
+
+  if (curveType === "hypotrochoid") {
+    maxRadius = outerRadius - innerRadius + centerSize;
+  } else if (curveType === "epitrochoid") {
+    maxRadius = outerRadius + innerRadius + centerSize;
+  } else if (curveType === "rose") {
+    maxRadius = outerRadius;
+  } else if (curveType === "lissajous") {
+    maxRadius = max(outerRadius, innerRadius);
+  } else if (curveType === "superformula") {
+    maxRadius = outerRadius;
+  } else if (curveType === "harmonograph") {
+    maxRadius = outerRadius * 0.5 + innerRadius * 0.5;
+  } else if (curveType === "hypocycloid") {
+    maxRadius = outerRadius;
+  } else if (curveType === "epicycloid") {
+    maxRadius = outerRadius + 2 * innerRadius;
+  } else if (curveType === "cycloid") {
+    maxRadius = 2 * innerRadius;
+  } else if (curveType === "trochoid") {
+    maxRadius = innerRadius + centerSize;
+  } else if (curveType === "limacon") {
+    maxRadius = outerRadius + innerRadius;
+  } else if (curveType === "ellipse") {
+    maxRadius = max(outerRadius, innerRadius);
+  }
+
+  if (maxRadius > 0) {
+    const maxAllowedRadius = min(width, height) / 2;
+    const newScale = maxAllowedRadius / maxRadius;
+    params.scale = newScale;
+    document.getElementById("scale").value = newScale;
+    const display = document.getElementById("scale-value");
+    if (display) {
+      display.textContent = newScale.toFixed(2);
+    }
+  }
+}
+
+let nextTheme = null;
+let currentThemeName = "";
+
+function shuffleTheme() {
+  if (!Array.isArray(window.themes) || window.themes.length === 0) return;
+  nextTheme = window.themes[Math.floor(Math.random() * window.themes.length)];
+  currentThemeName = nextTheme.name;
+  fadeState = "fading-out";
 }
 
 function toggleFullscreenCanvas() {
   const container = document.getElementById("canvas-container");
   const controls = document.getElementById("controls");
+  const button = document.getElementById("fullscreenToggle");
 
   if (!document.fullscreenElement) {
     container?.requestFullscreen().then(() => {
       fullscreenMode = true;
       if (controls) controls.style.display = "none";
+      if (button) button.innerHTML = "&#x2715;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
       resetSpirographs();
@@ -232,6 +450,7 @@ function toggleFullscreenCanvas() {
     document.exitFullscreen().then(() => {
       fullscreenMode = false;
       if (controls) controls.style.display = "block";
+      if (button) button.innerHTML = "&#x26F6;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
       resetSpirographs();
@@ -241,39 +460,16 @@ function toggleFullscreenCanvas() {
 
 document.addEventListener("fullscreenchange", () => {
   const controls = document.getElementById("controls");
+  const button = document.getElementById("fullscreenToggle");
   fullscreenMode = !!document.fullscreenElement;
   if (controls) controls.style.display = fullscreenMode ? "none" : "block";
+  if (button) {
+    button.style.display = "block";
+    button.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
+  }
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
   resetSpirographs();
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
-  document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
 
-  document.querySelectorAll("input[type=range]").forEach(input => {
-    const display = document.getElementById(input.id + "-value");
-    if (display) {
-      display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
-    }
-    input.addEventListener("input", () => {
-      const display = document.getElementById(input.id + "-value");
-      if (display) {
-        display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
-      }
-      updateAllParams();
-      resetSpirographs();
-    });
-  });
-
-  document.querySelectorAll("select, input[type=checkbox]").forEach(el => {
-    el.addEventListener("change", () => {
-      updateAllParams();
-      resetSpirographs();
-    });
-  });
-
-  updateAllParams();
-  resetSpirographs();
-});
