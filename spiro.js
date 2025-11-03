@@ -8,6 +8,12 @@ let fadeState = "none"; // "none", "fading-out", "fading-in"
 let fadeAlpha = 0;
 let autoPlayTimer = null;
 let autoPlayCountdown = 0;
+let customFont = null;
+
+function preload() {
+  // Load Peckham Press font locally
+  customFont = loadFont('peckham-press.ttf');
+}
 
 function randomizeParameters() {
   // Randomly select curve types
@@ -228,19 +234,27 @@ function draw() {
   }
 
   // Draw theme name with custom styling
-  textFont('Peckham Press, serif');
-  textSize(24);
-  textAlign(LEFT, BOTTOM);
-  
-  // Add a subtle glow effect
-  drawingContext.shadowBlur = 15;
-  drawingContext.shadowColor = 'rgba(255, 108, 255, 0.6)';
-  
-  fill(255, 200);
-  text(currentThemeName, 20, height - 20);
-  
-  // Reset shadow
-  drawingContext.shadowBlur = 0;
+  if (customFont) {
+    textFont(customFont);
+    textSize(24);
+    textAlign(LEFT, BOTTOM);
+    
+    // Add a subtle glow effect
+    drawingContext.shadowBlur = 15;
+    drawingContext.shadowColor = 'rgba(255, 108, 255, 0.6)';
+    
+    fill(255, 200);
+    text(currentThemeName, 20, height - 20);
+    
+    // Reset shadow
+    drawingContext.shadowBlur = 0;
+  } else {
+    // Fallback if font doesn't load
+    textSize(12);
+    textAlign(LEFT, BOTTOM);
+    fill(255);
+    text(currentThemeName, 10, height - 10);
+  }
 }
 
 function drawCurve(index, layer) {
