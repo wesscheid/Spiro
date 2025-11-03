@@ -27,7 +27,7 @@ function randomizeParameters() {
     inner: Math.floor(Math.random() * 200) + 20, // 20-220
     center: Math.floor(Math.random() * 200) + 20, // 20-220
     points: Math.floor(Math.random() * 48) + 4, // 4-52
-    scale: Math.random() * 1.5 + 0.3, // 0.3-1.8
+    // scale: (removed from auto-play)  <-- scale is intentionally excluded to preserve current UI scale
     layers: Math.floor(Math.random() * 6) + 1, // 1-7
     offset: ["radius", "rotation", "phase"][Math.floor(Math.random() * 3)],
     offsetAmount: Math.random() * 0.5 + 0.02, // 0.02-0.52
@@ -161,7 +161,8 @@ function draw() {
           innerRadius: choice.inner ?? 80,
           centerSize: choice.center ?? 60,
           numPoints: choice.points ?? 12,
-          scale: choice.scale ?? 1.0,
+          // use current params.scale if auto-play didn't provide a scale
+          scale: choice.scale ?? params.scale,
           numLayers: choice.layers ?? 2,
           layerOffsetMode: choice.offset || "radius",
           layerOffsetAmount: choice.offsetAmount ?? 0.06,
