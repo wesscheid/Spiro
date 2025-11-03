@@ -228,13 +228,8 @@ function draw() {
   }
 
   // Draw theme name with custom styling
-  // Force load the font before using it
-  document.fonts.load('24px "Peckham Press"').then(() => {
-    // Font is now loaded
-  });
-  
-  // Set font directly on canvas context (more reliable than textFont)
-  drawingContext.font = '24px "Peckham Press"';
+  textFont('Rubik Dirt, system-ui'); // or try 'Rubik Burned, cursive'
+  textSize(20);
   textAlign(LEFT, BOTTOM);
   
   // Add a subtle glow effect

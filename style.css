@@ -1,9 +1,5 @@
-@font-face {
-  font-family: 'Peckham Press';
-  src: url('peckham-press.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
+@import url('https://fonts.googleapis.com/css2?family=Rubik+Dirt&display=swap');
+
 body {
   margin: 0;
   display: flex;
