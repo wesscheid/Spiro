@@ -12,7 +12,7 @@ let customFont = null;
 
 function preload() {
   // Load Peckham Press font locally
-  customFont = loadFont('peckham-press.ttf');
+  customFont = loadFont('peckham-press.otf');
 }
 
 function randomizeParameters() {
