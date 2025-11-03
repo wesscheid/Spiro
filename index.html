@@ -194,6 +194,18 @@
       <label for="colorSpread">Color Spread <span id="colorSpread-value" class="value-display"></span></label>
       <input id="colorSpread" type="range" min="0" max="360" step="1" value="120">
     </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="autoPlay"> Auto-play
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="autoPlayInterval">Interval (seconds) <span id="autoPlayInterval-value" class="value-display"></span></label>
+      <input id="autoPlayInterval" type="range" min="1" max="30" step="1" value="5">
+      <small>Next change in: <span id="autoPlayCountdown">--</span>s</small>
+    </div>
   </div>
 
   <div id="canvas-container"></div>

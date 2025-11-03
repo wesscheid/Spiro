@@ -6,6 +6,52 @@ let canvasEl = null;
 let themeTransition = null;
 let fadeState = "none"; // "none", "fading-out", "fading-in"
 let fadeAlpha = 0;
+let autoPlayTimer = null;
+let autoPlayCountdown = 0;
+
+function randomizeParameters() {
+  // Randomly select curve types
+  const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse"];
+  const primaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
+  const secondaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
+  
+  currentThemeName = "Random";
+  
+  nextTheme = {
+    name: "Random",
+    curveType: primaryCurve,
+    dual: Math.random() > 0.6, // 40% chance of dual mode
+    secondary: secondaryCurve,
+    dualMode: ["blend", "combine", "alternate"][Math.floor(Math.random() * 3)],
+    outer: Math.floor(Math.random() * 280) + 80, // 80-360
+    inner: Math.floor(Math.random() * 200) + 20, // 20-220
+    center: Math.floor(Math.random() * 200) + 20, // 20-220
+    points: Math.floor(Math.random() * 48) + 4, // 4-52
+    scale: Math.random() * 1.5 + 0.3, // 0.3-1.8
+    layers: Math.floor(Math.random() * 6) + 1, // 1-7
+    offset: ["radius", "rotation", "phase"][Math.floor(Math.random() * 3)],
+    offsetAmount: Math.random() * 0.5 + 0.02, // 0.02-0.52
+    reverse: Math.random() > 0.5,
+    speed: Math.random() * 0.035 + 0.005, // 0.005-0.04
+    trail: Math.floor(Math.random() * 300) + 30, // 30-330
+    lineWeight: Math.random() * 4 + 0.5, // 0.5-4.5
+    lineThinning: Math.random() * 0.9 + 0.1, // 0.1-1.0
+    hue: Math.floor(Math.random() * 360), // 0-360
+    spread: Math.floor(Math.random() * 300) + 30, // 30-330
+    // Superformula params
+    m: Math.random() * 18 + 1, // 1-19
+    n1: Math.random() * 8 + 0.2, // 0.2-8.2
+    n2: Math.random() * 8 + 0.2, // 0.2-8.2
+    n3: Math.random() * 8 + 0.2, // 0.2-8.2
+    // Harmonograph params
+    f1: Math.random() * 9 + 0.5, // 0.5-9.5
+    f2: Math.random() * 9 + 0.5, // 0.5-9.5
+    d1: Math.random() * 0.005 + 0.0001, // 0.0001-0.0051
+    d2: Math.random() * 0.005 + 0.0001 // 0.0001-0.0051
+  };
+  
+  fadeState = "fading-out";
+}
 
 function getCanvasSize() {
   const controls = document.getElementById("controls");
@@ -22,9 +68,22 @@ function setup() {
   c.parent("canvas-container");
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
+  fadeAlpha = 0; // Initialize fade alpha
 
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
+
+  const autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
+  if (autoPlayIntervalSlider) {
+    autoPlayIntervalSlider.addEventListener("input", () => {
+      const display = document.getElementById("autoPlayInterval-value");
+      if (display) {
+        display.textContent = autoPlayIntervalSlider.value;
+      }
+      params.autoPlayInterval = parseInt(autoPlayIntervalSlider.value, 10);
+      resetAutoPlayTimer();
+    });
+  }
 
   const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "autoScale", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
   const styleParams = ["animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread"];
@@ -32,7 +91,8 @@ function setup() {
   shapeParams.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener("input", () => {
+      const eventType = el.type === "checkbox" ? "change" : "input";
+      el.addEventListener(eventType, () => {
         updateShapeParams();
         resetSpirographs();
         const display = document.getElementById(id + "-value");
@@ -46,7 +106,8 @@ function setup() {
   styleParams.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener("input", () => {
+      const eventType = el.type === "checkbox" ? "change" : "input";
+      el.addEventListener(eventType, () => {
         updateStyleParams();
         const display = document.getElementById(id + "-value");
         if (display) {
@@ -56,10 +117,18 @@ function setup() {
     }
   });
 
+  // Add specific listener for autoPlay checkbox
+  const autoPlayCheckbox = document.getElementById("autoPlay");
+  if (autoPlayCheckbox) {
+    autoPlayCheckbox.addEventListener("change", () => {
+      updateStyleParams();
+    });
+  }
+
   updateShapeParams();
   updateStyleParams();
   resetSpirographs();
-  updateParameterVisibility(params.curveType);
+  updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
 function windowResized() {
@@ -158,10 +227,20 @@ function draw() {
     }
   }
 
-  fill(255);
-  textSize(12);
+  // Draw theme name with custom styling
+  textFont('Peckham Press, serif');
+  textSize(24);
   textAlign(LEFT, BOTTOM);
-  text(currentThemeName, 10, height - 10);
+  
+  // Add a subtle glow effect
+  drawingContext.shadowBlur = 15;
+  drawingContext.shadowColor = 'rgba(255, 108, 255, 0.6)';
+  
+  fill(255, 200);
+  text(currentThemeName, 20, height - 20);
+  
+  // Reset shadow
+  drawingContext.shadowBlur = 0;
 }
 
 function drawCurve(index, layer) {
@@ -301,7 +380,7 @@ function updateShapeParams() {
     autoAdjustScale();
   }
 
-  updateParameterVisibility(params.curveType);
+  updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
 function updateStyleParams() {
@@ -313,6 +392,46 @@ function updateStyleParams() {
   params.lineThinning = parseFloat(get("lineThinning")?.value || 0.7);
   params.baseHue = parseFloat(get("baseHue")?.value || 260);
   params.colorSpread = parseFloat(get("colorSpread")?.value || 120);
+  params.autoPlay = get("autoPlay")?.checked || false;
+  params.autoPlayInterval = parseInt(get("autoPlayInterval")?.value || 5, 10);
+
+  const autoPlayIntervalDisplay = document.getElementById("autoPlayInterval-value");
+  if (autoPlayIntervalDisplay) {
+    autoPlayIntervalDisplay.textContent = params.autoPlayInterval;
+  }
+
+  resetAutoPlayTimer();
+}
+
+function resetAutoPlayTimer() {
+  if (autoPlayTimer) clearInterval(autoPlayTimer);
+
+  if (params.autoPlay) {
+    autoPlayCountdown = params.autoPlayInterval;
+    updateCountdown(); // Show initial countdown immediately
+    
+    autoPlayTimer = setInterval(() => {
+      autoPlayCountdown--;
+      updateCountdown();
+      
+      if (autoPlayCountdown <= 0) {
+        randomizeParameters();
+        autoPlayCountdown = params.autoPlayInterval; // Reset for next cycle
+      }
+    }, 1000);
+  } else {
+    const countdownDisplay = document.getElementById("autoPlayCountdown");
+    if (countdownDisplay) {
+      countdownDisplay.textContent = "--";
+    }
+  }
+}
+
+function updateCountdown() {
+  const countdownDisplay = document.getElementById("autoPlayCountdown");
+  if (countdownDisplay) {
+    countdownDisplay.textContent = autoPlayCountdown;
+  }
 }
 
 function updateUIFromParams() {
@@ -347,7 +466,7 @@ function updateUIFromParams() {
   });
 }
 
-function updateParameterVisibility(curveType) {
+function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
   const controls = {
     outerRadius: document.getElementById("outerRadius").parentElement,
     innerRadius: document.getElementById("innerRadius").parentElement,
@@ -371,8 +490,11 @@ function updateParameterVisibility(curveType) {
     ellipse: ["outerRadius", "innerRadius"]
   };
 
+  const primaryVisibility = visibility[primaryCurveType] || [];
+  const secondaryVisibility = document.getElementById("dualCurveMode").checked && visibility[secondaryCurveType] ? visibility[secondaryCurveType] : [];
+
   Object.keys(controls).forEach(key => {
-    if (visibility[curveType] && visibility[curveType].includes(key)) {
+    if (primaryVisibility.includes(key) || secondaryVisibility.includes(key)) {
       controls[key].style.display = "block";
     } else {
       controls[key].style.display = "none";
@@ -471,5 +593,3 @@ document.addEventListener("fullscreenchange", () => {
   resizeCanvas(w, h);
   resetSpirographs();
 });
-
-
