@@ -27,7 +27,6 @@ function randomizeParameters() {
     inner: Math.floor(Math.random() * 200) + 20, // 20-220
     center: Math.floor(Math.random() * 200) + 20, // 20-220
     points: Math.floor(Math.random() * 48) + 4, // 4-52
-    // scale: (removed from auto-play)  <-- scale is intentionally excluded to preserve current UI scale
     layers: Math.floor(Math.random() * 6) + 1, // 1-7
     offset: ["radius", "rotation", "phase"][Math.floor(Math.random() * 3)],
     offsetAmount: Math.random() * 0.5 + 0.02, // 0.02-0.52
@@ -161,8 +160,7 @@ function draw() {
           innerRadius: choice.inner ?? 80,
           centerSize: choice.center ?? 60,
           numPoints: choice.points ?? 12,
-          // use current params.scale if auto-play didn't provide a scale
-          scale: choice.scale ?? params.scale,
+          scale: choice.scale ?? 1.0,
           numLayers: choice.layers ?? 2,
           layerOffsetMode: choice.offset || "radius",
           layerOffsetAmount: choice.offsetAmount ?? 0.06,
@@ -229,15 +227,15 @@ function draw() {
   }
 
   // Draw theme name with custom styling
-  textFont('Rubik Dirt, system-ui'); // or try 'Rubik Burned, cursive'
-  textSize(20);
+  textFont("Splash");
+  textSize(36);
   textAlign(LEFT, BOTTOM);
   
   // Add a subtle glow effect
   drawingContext.shadowBlur = 15;
   drawingContext.shadowColor = 'rgba(255, 108, 255, 0.6)';
   
-  fill(255, 200);
+  fill(255, 64);
   text(currentThemeName, 20, height - 20);
   
   // Reset shadow
