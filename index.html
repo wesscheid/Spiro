@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Flow Curves Explorer — Complete</title>
+  <title>Flow Curves Explorer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.2/p5.min.js"></script>
   <link rel="stylesheet" href="style.css">
@@ -15,206 +15,265 @@
   <button id="fullscreenToggle">&#x26F6;</button>
 
   <div id="controls">
-    <h2>Curve Types</h2>
-
-    <div class="control-group">
-      <label for="curveType">PRIMARY CURVE</label>
-      <select id="curveType">
-        <option value="hypotrochoid">Hypotrochoid</option>
-        <option value="epitrochoid">Epitrochoid</option>
-        <option value="rose">Rose Curve</option>
-        <option value="lissajous">Lissajous</option>
-        <option value="superformula">Superformula</option>
-        <option value="harmonograph">Harmonograph</option>
-        <option value="hypocycloid">Hypocycloid</option>
-        <option value="epicycloid">Epicycloid</option>
-        <option value="cycloid">Cycloid</option>
-        <option value="trochoid">Trochoid</option>
-        <option value="limacon">Limacon</option>
-        <option value="ellipse">Ellipse</option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label>
-        <input type="checkbox" id="dualCurveMode"> ENABLE DUAL CURVE MODE
-      </label>
-    </div>
-
-    <div class="control-group">
-      <label for="secondaryCurve">SECONDARY CURVE</label>
-      <select id="secondaryCurve">
-        <option value="hypotrochoid">Hypotrochoid</option>
-        <option value="epitrochoid">Epitrochoid</option>
-        <option value="rose">Rose Curve</option>
-        <option value="lissajous">Lissajous</option>
-        <option value="superformula">Superformula</option>
-        <option value="harmonograph">Harmonograph</option>
-        <option value="hypocycloid">Hypocycloid</option>
-        <option value="epicycloid">Epicycloid</option>
-        <option value="cycloid">Cycloid</option>
-        <option value="trochoid">Trochoid</option>
-        <option value="limacon">Limacon</option>
-        <option value="ellipse">Ellipse</option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label for="dualModeType">DUAL MODE TYPE</label>
-      <select id="dualModeType">
-        <option value="blend">Blend</option>
-        <option value="combine">Combine</option>
-        <option value="alternate">Alternate Layers</option>
-      </select>
-    </div>
-
-    <div class="control-group" id="superformula-controls" style="display: none;">
-      <h2>Superformula</h2>
-      <div class="control-group">
-        <label for="m">m <span id="m-value" class="value-display"></span></label>
-        <input id="m" type="range" min="0" max="20" step="0.1" value="6">
+    <!-- PRESETS & THEMES SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>🎨 Presets & Themes</h3>
+        <span class="section-toggle">▼</span>
       </div>
-      <div class="control-group">
-        <label for="n1">n1 <span id="n1-value" class="value-display"></span></label>
-        <input id="n1" type="range" min="0.1" max="10" step="0.1" value="0.3">
-      </div>
-      <div class="control-group">
-        <label for="n2">n2 <span id="n2-value" class="value-display"></span></label>
-        <input id="n2" type="range" min="0.1" max="10" step="0.1" value="1.7">
-      </div>
-      <div class="control-group">
-        <label for="n3">n3 <span id="n3-value" class="value-display"></span></label>
-        <input id="n3" type="range" min="0.1" max="10" step="0.1" value="1.7">
+      <div class="section-content">
+        <div class="control-group">
+          <label for="themeSelect">Theme</label>
+          <select id="themeSelect"></select>
+        </div>
+        <div class="control-group">
+          <button id="shuffleTheme">Shuffle Theme</button>
+          <button id="savePreset">Save Preset</button>
+        </div>
       </div>
     </div>
 
-    <div class="control-group" id="harmonograph-controls" style="display: none;">
-      <h2>Harmonograph</h2>
-      <div class="control-group">
-        <label for="f1">f1 <span id="f1-value" class="value-display"></span></label>
-        <input id="f1" type="range" min="0" max="10" step="0.01" value="2">
+    <!-- CURVE TYPE SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>📐 Curve Type</h3>
+        <span class="section-toggle">▼</span>
       </div>
-      <div class="control-group">
-        <label for="f2">f2 <span id="f2-value" class="value-display"></span></label>
-        <input id="f2" type="range" min="0" max="10" step="0.01" value="3">
+      <div class="section-content">
+        <div class="control-group">
+          <label for="curveType">Primary Curve</label>
+          <select id="curveType">
+            <option value="hypotrochoid">Hypotrochoid</option>
+            <option value="epitrochoid">Epitrochoid</option>
+            <option value="rose">Rose Curve</option>
+            <option value="lissajous">Lissajous</option>
+            <option value="superformula">Superformula</option>
+            <option value="harmonograph">Harmonograph</option>
+            <option value="hypocycloid">Hypocycloid</option>
+            <option value="epicycloid">Epicycloid</option>
+            <option value="cycloid">Cycloid</option>
+            <option value="trochoid">Trochoid</option>
+            <option value="limacon">Limacon</option>
+            <option value="ellipse">Ellipse</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="dualCurveMode"> Dual Curve Mode
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label for="secondaryCurve">Secondary Curve</label>
+          <select id="secondaryCurve">
+            <option value="hypotrochoid">Hypotrochoid</option>
+            <option value="epitrochoid">Epitrochoid</option>
+            <option value="rose">Rose Curve</option>
+            <option value="lissajous">Lissajous</option>
+            <option value="superformula">Superformula</option>
+            <option value="harmonograph">Harmonograph</option>
+            <option value="hypocycloid">Hypocycloid</option>
+            <option value="epicycloid">Epicycloid</option>
+            <option value="cycloid">Cycloid</option>
+            <option value="trochoid">Trochoid</option>
+            <option value="limacon">Limacon</option>
+            <option value="ellipse">Ellipse</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="dualModeType">Dual Mode Type</label>
+          <select id="dualModeType">
+            <option value="blend">Blend</option>
+            <option value="combine">Combine</option>
+            <option value="alternate">Alternate Layers</option>
+          </select>
+        </div>
       </div>
-      <div class="control-group">
-        <label for="d1">d1 <span id="d1-value" class="value-display"></span></label>
-        <input id="d1" type="range" min="0" max="0.1" step="0.0001" value="0.0006">
+    </div>
+
+    <!-- GEOMETRY SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>📏 Geometry</h3>
+        <span class="section-toggle">▼</span>
       </div>
-      <div class="control-group">
-        <label for="d2">d2 <span id="d2-value" class="value-display"></span></label>
-        <input id="d2" type="range" min="0" max="0.1" step="0.0001" value="0.0008">
+      <div class="section-content">
+        <div class="control-group">
+          <label for="outerRadius">Outer Radius <span id="outerRadius-value" class="value-display"></span></label>
+          <input id="outerRadius" type="range" min="20" max="400" value="180" step="1">
+        </div>
+
+        <div class="control-group">
+          <label for="innerRadius">Inner Radius <span id="innerRadius-value" class="value-display"></span></label>
+          <input id="innerRadius" type="range" min="5" max="300" value="80" step="1">
+        </div>
+
+        <div class="control-group">
+          <label for="centerSize">Center Size <span id="centerSize-value" class="value-display"></span></label>
+          <input id="centerSize" type="range" min="0" max="300" value="60" step="1">
+        </div>
+
+        <div class="control-group">
+          <label for="scale">Scale <span id="scale-value" class="value-display"></span></label>
+          <input id="scale" type="range" min="0.1" max="2" value="1" step="0.01">
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="autoScale"> Auto-adjust Scale
+          </label>
+        </div>
       </div>
     </div>
 
-    <div class="control-group">
-      <label>
-        <input type="checkbox" id="autoScale"> Auto-adjust Scale
-      </label>
+    <!-- POINTS & LAYERS SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>✨ Points & Layers</h3>
+        <span class="section-toggle">▼</span>
+      </div>
+      <div class="section-content">
+        <div class="control-group">
+          <label for="numPoints">Points <span id="numPoints-value" class="value-display"></span></label>
+          <input id="numPoints" type="range" min="1" max="48" value="12" step="1">
+        </div>
+
+        <div class="control-group">
+          <label for="numLayers">Layers <span id="numLayers-value" class="value-display"></span></label>
+          <input id="numLayers" type="range" min="1" max="16" value="2" step="1">
+        </div>
+
+        <div class="control-group">
+          <label for="layerOffsetMode">Layer Offset Mode</label>
+          <select id="layerOffsetMode">
+            <option value="radius">Radius</option>
+            <option value="rotation">Rotation</option>
+            <option value="phase">Phase</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="layerOffsetAmount">Layer Offset Amount <span id="layerOffsetAmount-value" class="value-display"></span></label>
+          <input id="layerOffsetAmount" type="range" min="0" max="1" step="0.01" value="0.06">
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="reverseLayers"> Reverse Alternate Layers
+          </label>
+        </div>
+      </div>
     </div>
 
-    <div class="control-group">
-      <label for="themeSelect">Theme</label>
-      <select id="themeSelect"></select>
+    <!-- ANIMATION SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>⚡ Animation & Trail</h3>
+        <span class="section-toggle">▼</span>
+      </div>
+      <div class="section-content">
+        <div class="control-group">
+          <label for="animSpeed">Anim Speed <span id="animSpeed-value" class="value-display"></span></label>
+          <input id="animSpeed" type="range" min="0" max="0.04" step="0.001" value="0.02">
+        </div>
+
+        <div class="control-group">
+          <label for="trailLength">Trail Length <span id="trailLength-value" class="value-display"></span></label>
+          <input id="trailLength" type="range" min="10" max="400" step="1" value="50">
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="autoPlay"> Auto-play
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label for="autoPlayInterval">Interval (seconds) <span id="autoPlayInterval-value" class="value-display"></span></label>
+          <input id="autoPlayInterval" type="range" min="1" max="30" step="1" value="5">
+          <small>Next change in: <span id="autoPlayCountdown">--</span>s</small>
+        </div>
+      </div>
     </div>
 
-    <div class="control-group">
-      <button id="shuffleTheme">Shuffle Theme</button>
-      <button id="savePreset">Save Preset</button>
+    <!-- STYLING SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>🎨 Styling</h3>
+        <span class="section-toggle">▼</span>
+      </div>
+      <div class="section-content">
+        <div class="control-group">
+          <label for="lineWeight">Line Weight <span id="lineWeight-value" class="value-display"></span></label>
+          <input id="lineWeight" type="range" min="0.1" max="6" step="0.1" value="1.6">
+        </div>
+
+        <div class="control-group">
+          <label for="lineThinning">Line Thinning <span id="lineThinning-value" class="value-display"></span></label>
+          <input id="lineThinning" type="range" min="0" max="1" step="0.01" value="0.7">
+        </div>
+
+        <div class="control-group">
+          <label for="baseHue">Base Hue <span id="baseHue-value" class="value-display"></span></label>
+          <input id="baseHue" type="range" min="0" max="360" step="1" value="260">
+        </div>
+
+        <div class="control-group">
+          <label for="colorSpread">Color Spread <span id="colorSpread-value" class="value-display"></span></label>
+          <input id="colorSpread" type="range" min="0" max="360" step="1" value="120">
+        </div>
+      </div>
     </div>
 
-    <!-- Example numeric controls — ensure these IDs match spiro.js updateAllParams expectations -->
-    <div class="control-group">
-      <label for="outerRadius">Outer Radius <span id="outerRadius-value" class="value-display"></span></label>
-      <input id="outerRadius" type="range" min="20" max="400" value="180" step="1">
-    </div>
+    <!-- ADVANCED SECTION -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <h3>⚙️ Advanced</h3>
+        <span class="section-toggle">▼</span>
+      </div>
+      <div class="section-content">
+        <div class="control-group" id="superformula-controls" style="display: none;">
+          <h4 style="margin: 8px 0; font-size: 12px; color: #ff6cff;">Superformula</h4>
+          <div class="control-group">
+            <label for="m">m <span id="m-value" class="value-display"></span></label>
+            <input id="m" type="range" min="0" max="20" step="0.1" value="6">
+          </div>
+          <div class="control-group">
+            <label for="n1">n1 <span id="n1-value" class="value-display"></span></label>
+            <input id="n1" type="range" min="0.1" max="10" step="0.1" value="0.3">
+          </div>
+          <div class="control-group">
+            <label for="n2">n2 <span id="n2-value" class="value-display"></span></label>
+            <input id="n2" type="range" min="0.1" max="10" step="0.1" value="1.7">
+          </div>
+          <div class="control-group">
+            <label for="n3">n3 <span id="n3-value" class="value-display"></span></label>
+            <input id="n3" type="range" min="0.1" max="10" step="0.1" value="1.7">
+          </div>
+        </div>
 
-    <div class="control-group">
-      <label for="innerRadius">Inner Radius <span id="innerRadius-value" class="value-display"></span></label>
-      <input id="innerRadius" type="range" min="5" max="300" value="80" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="centerSize">Center Size <span id="centerSize-value" class="value-display"></span></label>
-      <input id="centerSize" type="range" min="0" max="300" value="60" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="numPoints">Points <span id="numPoints-value" class="value-display"></span></label>
-      <input id="numPoints" type="range" min="1" max="48" value="12" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="scale">Scale <span id="scale-value" class="value-display"></span></label>
-      <input id="scale" type="range" min="0.1" max="2" value="1" step="0.01">
-    </div>
-
-    <div class="control-group">
-      <label for="numLayers">Layers <span id="numLayers-value" class="value-display"></span></label>
-      <input id="numLayers" type="range" min="1" max="16" value="2" step="1">
-    </div>
-
-    <div class="control-group">
-      <label for="layerOffsetMode">Layer Offset Mode</label>
-      <select id="layerOffsetMode">
-        <option value="radius">Radius</option>
-        <option value="rotation">Rotation</option>
-        <option value="phase">Phase</option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label for="layerOffsetAmount">Layer Offset Amount <span id="layerOffsetAmount-value" class="value-display"></span></label>
-      <input id="layerOffsetAmount" type="range" min="0" max="1" step="0.01" value="0.06">
-    </div>
-
-    <div class="control-group">
-      <label>
-        <input type="checkbox" id="reverseLayers"> Reverse Alternate Layers
-      </label>
-    </div>
-
-    <div class="control-group">
-      <label for="animSpeed">Anim Speed <span id="animSpeed-value" class="value-display"></span></label>
-      <input id="animSpeed" type="range" min="0" max="0.04" step="0.001" value="0.02">
-    </div>
-
-    <div class="control-group">
-      <label for="trailLength">Trail Length <span id="trailLength-value" class="value-display"></span></label>
-      <input id="trailLength" type="range" min="10" max="400" step="1" value="50">
-    </div>
-
-    <div class="control-group">
-      <label for="lineWeight">Line Weight <span id="lineWeight-value" class="value-display"></span></label>
-      <input id="lineWeight" type="range" min="0.1" max="6" step="0.1" value="1.6">
-    </div>
-
-    <div class="control-group">
-      <label for="lineThinning">Line Thinning <span id="lineThinning-value" class="value-display"></span></label>
-      <input id="lineThinning" type="range" min="0" max="1" step="0.01" value="0.7">
-    </div>
-
-    <div class="control-group">
-      <label for="baseHue">Base Hue <span id="baseHue-value" class="value-display"></span></label>
-      <input id="baseHue" type="range" min="0" max="360" step="1" value="260">
-    </div>
-
-    <div class="control-group">
-      <label for="colorSpread">Color Spread <span id="colorSpread-value" class="value-display"></span></label>
-      <input id="colorSpread" type="range" min="0" max="360" step="1" value="120">
-    </div>
-
-    <div class="control-group">
-      <label>
-        <input type="checkbox" id="autoPlay"> Auto-play
-      </label>
-    </div>
-
-    <div class="control-group">
-      <label for="autoPlayInterval">Interval (seconds) <span id="autoPlayInterval-value" class="value-display"></span></label>
-      <input id="autoPlayInterval" type="range" min="1" max="30" step="1" value="5">
-      <small>Next change in: <span id="autoPlayCountdown">--</span>s</small>
+        <div class="control-group" id="harmonograph-controls" style="display: none;">
+          <h4 style="margin: 8px 0; font-size: 12px; color: #ff6cff;">Harmonograph</h4>
+          <div class="control-group">
+            <label for="f1">f1 <span id="f1-value" class="value-display"></span></label>
+            <input id="f1" type="range" min="0" max="10" step="0.01" value="2">
+          </div>
+          <div class="control-group">
+            <label for="f2">f2 <span id="f2-value" class="value-display"></span></label>
+            <input id="f2" type="range" min="0" max="10" step="0.01" value="3">
+          </div>
+          <div class="control-group">
+            <label for="d1">d1 <span id="d1-value" class="value-display"></span></label>
+            <input id="d1" type="range" min="0" max="0.1" step="0.0001" value="0.0006">
+          </div>
+          <div class="control-group">
+            <label for="d2">d2 <span id="d2-value" class="value-display"></span></label>
+            <input id="d2" type="range" min="0" max="0.1" step="0.0001" value="0.0008">
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -222,5 +281,22 @@
 
   <script src="themes.js"></script>
   <script src="spiro.js"></script>
+  <script>
+    function toggleSection(header) {
+      const content = header.nextElementSibling;
+      const toggle = header.querySelector('.section-toggle');
+      
+      content.classList.toggle('collapsed');
+      toggle.classList.toggle('collapsed');
+    }
+
+    // Collapse Advanced section by default
+    document.addEventListener('DOMContentLoaded', () => {
+      const advancedHeader = document.querySelector('.section:last-child .section-header');
+      if (advancedHeader) {
+        advancedHeader.click();
+      }
+    });
+  </script>
 </body>
 </html>
