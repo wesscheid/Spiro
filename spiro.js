@@ -8,6 +8,7 @@ let fadeState = "none"; // "none", "fading-out", "fading-in"
 let fadeAlpha = 0;
 let autoPlayTimer = null;
 let autoPlayCountdown = 0;
+let listenerController = new AbortController(); // For cleanup
 
 function randomizeParameters() {
   // Randomly select curve types
@@ -64,28 +65,18 @@ function getCanvasSize() {
   return { w: window.innerWidth - rect.width, h: window.innerHeight };
 }
 
-function setup() {
-  const { w, h } = getCanvasSize();
-  const c = createCanvas(w, h);
-  canvasEl = c.canvas;
-  c.parent("canvas-container");
-  colorMode(HSB, 360, 100, 100, 100);
-  frameRate(60);
-  fadeAlpha = 0; // Initialize fade alpha
+function setupEventListeners() {
+  const options = { signal: listenerController.signal };
 
-  document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
-  document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
-  document.getElementById("savePreset")?.addEventListener("click", savePreset);
-
-  window.themes.forEach(t => t.isBuiltIn = true);
-  loadCustomThemes();
-  populateThemes();
+  document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
+  document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
+  document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
 
   const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
     themeSelect.addEventListener("change", () => {
       applyTheme(themeSelect.value);
-    });
+    }, options);
   }
 
   const autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
@@ -97,7 +88,7 @@ function setup() {
       }
       params.autoPlayInterval = parseInt(autoPlayIntervalSlider.value, 10);
       resetAutoPlayTimer();
-    });
+    }, options);
   }
 
   const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "autoScale", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
@@ -114,7 +105,7 @@ function setup() {
         if (display) {
           display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
         }
-      });
+      }, options);
     }
   });
 
@@ -128,7 +119,7 @@ function setup() {
         if (display) {
           display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
         }
-      });
+      }, options);
     }
   });
 
@@ -137,8 +128,24 @@ function setup() {
   if (autoPlayCheckbox) {
     autoPlayCheckbox.addEventListener("change", () => {
       updateStyleParams();
-    });
+    }, options);
   }
+}
+
+function setup() {
+  const { w, h } = getCanvasSize();
+  const c = createCanvas(w, h);
+  canvasEl = c.canvas;
+  c.parent("canvas-container");
+  colorMode(HSB, 360, 100, 100, 100);
+  frameRate(60);
+  fadeAlpha = 0; // Initialize fade alpha
+
+  setupEventListeners();
+
+  window.themes.forEach(t => t.isBuiltIn = true);
+  loadCustomThemes();
+  populateThemes();
 
   updateShapeParams();
   updateStyleParams();
@@ -149,13 +156,28 @@ function setup() {
 function windowResized() {
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
-  resetSpirographs();
+  clearSpirographs();
 }
 
 function resetSpirographs() {
-  spirographs = [];
+  clearSpirographs();
   theta = 0;
   background(290, 80, 10);
+}
+
+function clearSpirographs() {
+  // Properly clear the nested array structure
+  spirographs.forEach(layer => {
+    if (Array.isArray(layer)) {
+      layer.forEach(points => {
+        if (Array.isArray(points)) {
+          points.length = 0;
+        }
+      });
+      layer.length = 0;
+    }
+  });
+  spirographs.length = 0;
 }
 
 function draw() {
@@ -163,7 +185,7 @@ function draw() {
     fadeAlpha = min(fadeAlpha + 10, 255);
     background(290, 80, 10, fadeAlpha);
     if (fadeAlpha === 255) {
-      resetSpirographs();
+      clearSpirographs();
       const choice = nextTheme;
       themeTransition = {
         from: { ...params },
@@ -661,6 +683,7 @@ let currentThemeName = "";
 
 function shuffleTheme() {
   if (!Array.isArray(window.themes) || window.themes.length === 0) return;
+  if (fadeState !== "none") return; // Prevent rapid-fire shuffles during fade
   nextTheme = window.themes[Math.floor(Math.random() * window.themes.length)];
   currentThemeName = nextTheme.name;
   fadeState = "fading-out";
@@ -678,7 +701,7 @@ function toggleFullscreenCanvas() {
       if (button) button.innerHTML = "&#x2715;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
-      resetSpirographs();
+      clearSpirographs();
     });
   } else {
     document.exitFullscreen().then(() => {
@@ -687,7 +710,7 @@ function toggleFullscreenCanvas() {
       if (button) button.innerHTML = "&#x26F6;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
-      resetSpirographs();
+      clearSpirographs();
     });
   }
 }
@@ -703,5 +726,5 @@ document.addEventListener("fullscreenchange", () => {
   }
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
-  resetSpirographs();
+  clearSpirographs();
 });
