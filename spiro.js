@@ -48,6 +48,10 @@ function randomizeParameters() {
     d1: Math.random() * 0.005 + 0.0001, // 0.0001-0.0051
     d2: Math.random() * 0.005 + 0.0001 // 0.0001-0.0051
   };
+
+  if (!document.getElementById("autoScale")?.checked) {
+    nextTheme.scale = params.scale;
+  }
   
   fadeState = "fading-out";
 }
@@ -71,6 +75,18 @@ function setup() {
 
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme);
+  document.getElementById("savePreset")?.addEventListener("click", savePreset);
+
+  window.themes.forEach(t => t.isBuiltIn = true);
+  loadCustomThemes();
+  populateThemes();
+
+  const themeSelect = document.getElementById("themeSelect");
+  if (themeSelect) {
+    themeSelect.addEventListener("change", () => {
+      applyTheme(themeSelect.value);
+    });
+  }
 
   const autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
   if (autoPlayIntervalSlider) {
@@ -540,6 +556,103 @@ function autoAdjustScale() {
     if (display) {
       display.textContent = newScale.toFixed(2);
     }
+  }
+}
+
+function loadCustomThemes() {
+  const customThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+  window.themes = [...window.themes, ...customThemes];
+}
+
+function saveCustomThemes() {
+  const customThemes = window.themes.filter(theme => !theme.isBuiltIn);
+  localStorage.setItem("spiro_custom_themes", JSON.stringify(customThemes));
+}
+
+function populateThemes() {
+  const themeSelect = document.getElementById("themeSelect");
+  if (themeSelect) {
+    const currentVal = themeSelect.value;
+    themeSelect.innerHTML = ""; // Clear existing options
+    
+    const customOption = document.createElement("option");
+    customOption.value = "Custom";
+    customOption.textContent = "Custom";
+    themeSelect.appendChild(customOption);
+
+    window.themes.forEach(theme => {
+      const option = document.createElement("option");
+      option.value = theme.name;
+      option.textContent = theme.name;
+      themeSelect.appendChild(option);
+    });
+
+    themeSelect.value = currentVal;
+  }
+}
+
+function applyTheme(themeName) {
+  if (themeName === "Custom") {
+    currentThemeName = "Custom";
+    return;
+  }
+  const theme = window.themes.find(t => t.name === themeName);
+  if (theme) {
+    nextTheme = theme;
+    currentThemeName = theme.name;
+    fadeState = "fading-out";
+  }
+}
+
+function savePreset() {
+  const name = prompt("Enter a name for your preset:");
+  if (name) {
+    const newPreset = {
+      name: name,
+      curveType: params.curveType,
+      dual: params.dualCurveMode,
+      secondary: params.secondaryCurve,
+      dualMode: params.dualModeType,
+      outer: params.outerRadius,
+      inner: params.innerRadius,
+      center: params.centerSize,
+      points: params.numPoints,
+      scale: params.scale,
+      layers: params.numLayers,
+      offset: params.layerOffsetMode,
+      offsetAmount: params.layerOffsetAmount,
+      reverse: params.reverseLayers,
+      speed: params.animSpeed,
+      trail: params.trailLength,
+      lineWeight: params.lineWeight,
+      lineThinning: params.lineThinning,
+      hue: params.baseHue,
+      spread: params.colorSpread,
+      m: params.m,
+      n1: params.n1,
+      n2: params.n2,
+      n3: params.n3,
+      f1: params.f1,
+      f2: params.f2,
+      d1: params.d1,
+      d2: params.d2,
+      isBuiltIn: false // Flag to distinguish custom themes
+    };
+
+    window.themes.push(newPreset);
+    saveCustomThemes(); // Save to localStorage
+    populateThemes(); // Update the dropdown
+    
+    // Select the new theme
+    const themeSelect = document.getElementById("themeSelect");
+    if (themeSelect) {
+      themeSelect.value = name;
+    }
+
+    // For now, I will just log the new preset to the console.
+    // Saving to themes.js is a bigger task.
+    console.log("New preset saved:", newPreset);
+    alert(`Preset '${name}' saved!`);
   }
 }
 
