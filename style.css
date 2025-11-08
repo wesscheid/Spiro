@@ -100,7 +100,8 @@ label {
 }
 
 input[type="range"] { 
-  width: 100%; 
+  width: 100%;
+  height: 6px;
 }
 
 .value-display { 
@@ -188,10 +189,58 @@ canvas {
 
   .section-header {
     margin: 12px 0 0 0;
+    padding: 12px 0;
+    border-bottom: 1px solid #333;
   }
 
   .section-header h3 {
+    font-size: 13px;
+  }
+
+  /* Mobile slider padding fix - prevents accidental taps while scrolling */
+  .control-group {
+    margin-bottom: 20px;
+    padding: 8px 0;
+  }
+
+  input[type="range"] {
+    height: 12px;
+    margin: 12px 0;
+    padding: 8px 0;
+    cursor: grab;
+  }
+
+  input[type="range"]:active {
+    cursor: grabbing;
+  }
+
+  /* Bigger touch targets for buttons */
+  button {
+    padding: 12px 8px;
+    font-size: 13px;
+    min-height: 44px;
+    margin-top: 8px;
+  }
+
+  #shuffleTheme,
+  #savePreset {
+    margin-top: 8px;
+  }
+
+  /* Hide value displays on mobile to save space */
+  .value-display {
+    display: none;
+  }
+
+  /* Better select styling on mobile */
+  select {
+    padding: 10px 6px;
+    min-height: 44px;
+  }
+
+  label {
     font-size: 12px;
+    margin-bottom: 8px;
   }
 }
 

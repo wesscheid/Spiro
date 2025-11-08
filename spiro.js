@@ -21,33 +21,31 @@ function randomizeParameters() {
   nextTheme = {
     name: "Random",
     curveType: primaryCurve,
-    dual: Math.random() > 0.6, // 40% chance of dual mode
+    dual: Math.random() > 0.6,
     secondary: secondaryCurve,
     dualMode: ["blend", "combine", "alternate"][Math.floor(Math.random() * 3)],
-    outer: Math.floor(Math.random() * 280) + 80, // 80-360
-    inner: Math.floor(Math.random() * 200) + 20, // 20-220
-    center: Math.floor(Math.random() * 200) + 20, // 20-220
-    points: Math.floor(Math.random() * 48) + 4, // 4-52
-    layers: Math.floor(Math.random() * 6) + 1, // 1-7
+    outer: Math.floor(Math.random() * 280) + 80,
+    inner: Math.floor(Math.random() * 200) + 20,
+    center: Math.floor(Math.random() * 200) + 20,
+    points: Math.floor(Math.random() * 48) + 4,
+    layers: Math.floor(Math.random() * 6) + 1,
     offset: ["radius", "rotation", "phase"][Math.floor(Math.random() * 3)],
-    offsetAmount: Math.random() * 0.5 + 0.02, // 0.02-0.52
+    offsetAmount: Math.random() * 0.5 + 0.02,
     reverse: Math.random() > 0.5,
-    speed: Math.random() * 0.035 + 0.005, // 0.005-0.04
-    trail: Math.floor(Math.random() * 300) + 30, // 30-330
-    lineWeight: Math.random() * 4 + 0.5, // 0.5-4.5
-    lineThinning: Math.random() * 0.9 + 0.1, // 0.1-1.0
-    hue: Math.floor(Math.random() * 360), // 0-360
-    spread: Math.floor(Math.random() * 300) + 30, // 30-330
-    // Superformula params
-    m: Math.random() * 18 + 1, // 1-19
-    n1: Math.random() * 8 + 0.2, // 0.2-8.2
-    n2: Math.random() * 8 + 0.2, // 0.2-8.2
-    n3: Math.random() * 8 + 0.2, // 0.2-8.2
-    // Harmonograph params
-    f1: Math.random() * 9 + 0.5, // 0.5-9.5
-    f2: Math.random() * 9 + 0.5, // 0.5-9.5
-    d1: Math.random() * 0.005 + 0.0001, // 0.0001-0.0051
-    d2: Math.random() * 0.005 + 0.0001 // 0.0001-0.0051
+    speed: Math.random() * 0.035 + 0.005,
+    trail: Math.floor(Math.random() * 300) + 30,
+    lineWeight: Math.random() * 4 + 0.5,
+    lineThinning: Math.random() * 0.9 + 0.1,
+    hue: Math.floor(Math.random() * 360),
+    spread: Math.floor(Math.random() * 300) + 30,
+    m: Math.random() * 18 + 1,
+    n1: Math.random() * 8 + 0.2,
+    n2: Math.random() * 8 + 0.2,
+    n3: Math.random() * 8 + 0.2,
+    f1: Math.random() * 9 + 0.5,
+    f2: Math.random() * 9 + 0.5,
+    d1: Math.random() * 0.005 + 0.0001,
+    d2: Math.random() * 0.005 + 0.0001
   };
 
   if (!document.getElementById("autoScale")?.checked) {
@@ -63,6 +61,27 @@ function getCanvasSize() {
   if (fullscreenMode) return { w: window.innerWidth, h: window.innerHeight };
   if (window.innerWidth <= 720) return { w: window.innerWidth, h: window.innerHeight - rect.height };
   return { w: window.innerWidth - rect.width, h: window.innerHeight };
+}
+
+function setup() {
+  const { w, h } = getCanvasSize();
+  const c = createCanvas(w, h);
+  canvasEl = c.canvas;
+  c.parent("canvas-container");
+  colorMode(HSB, 360, 100, 100, 100);
+  frameRate(60);
+  fadeAlpha = 0;
+
+  setupEventListeners();
+
+  window.themes.forEach(t => t.isBuiltIn = true);
+  loadCustomThemes();
+  populateThemes();
+
+  updateShapeParams();
+  updateStyleParams();
+  resetSpirographs();
+  updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
 function setupEventListeners() {
@@ -123,34 +142,12 @@ function setupEventListeners() {
     }
   });
 
-  // Add specific listener for autoPlay checkbox
   const autoPlayCheckbox = document.getElementById("autoPlay");
   if (autoPlayCheckbox) {
     autoPlayCheckbox.addEventListener("change", () => {
       updateStyleParams();
     }, options);
   }
-}
-
-function setup() {
-  const { w, h } = getCanvasSize();
-  const c = createCanvas(w, h);
-  canvasEl = c.canvas;
-  c.parent("canvas-container");
-  colorMode(HSB, 360, 100, 100, 100);
-  frameRate(60);
-  fadeAlpha = 0; // Initialize fade alpha
-
-  setupEventListeners();
-
-  window.themes.forEach(t => t.isBuiltIn = true);
-  loadCustomThemes();
-  populateThemes();
-
-  updateShapeParams();
-  updateStyleParams();
-  resetSpirographs();
-  updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
 function windowResized() {
@@ -166,7 +163,6 @@ function resetSpirographs() {
 }
 
 function clearSpirographs() {
-  // Properly clear the nested array structure
   spirographs.forEach(layer => {
     if (Array.isArray(layer)) {
       layer.forEach(points => {
@@ -264,19 +260,16 @@ function draw() {
     }
   }
 
-  // Draw theme name with custom styling
   textFont("Splash");
   textSize(36);
   textAlign(LEFT, BOTTOM);
   
-  // Add a subtle glow effect
   drawingContext.shadowBlur = 15;
   drawingContext.shadowColor = 'rgba(255, 108, 255, 0.6)';
   
   fill(255, 64);
   text(currentThemeName, 20, height - 20);
   
-  // Reset shadow
   drawingContext.shadowBlur = 0;
 }
 
@@ -445,7 +438,7 @@ function resetAutoPlayTimer() {
 
   if (params.autoPlay) {
     autoPlayCountdown = params.autoPlayInterval;
-    updateCountdown(); // Show initial countdown immediately
+    updateCountdown();
     
     autoPlayTimer = setInterval(() => {
       autoPlayCountdown--;
@@ -453,7 +446,7 @@ function resetAutoPlayTimer() {
       
       if (autoPlayCountdown <= 0) {
         randomizeParameters();
-        autoPlayCountdown = params.autoPlayInterval; // Reset for next cycle
+        autoPlayCountdown = params.autoPlayInterval;
       }
     }, 1000);
   } else {
@@ -582,20 +575,28 @@ function autoAdjustScale() {
 }
 
 function loadCustomThemes() {
-  const customThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
-  window.themes = [...window.themes, ...customThemes];
+  try {
+    const customThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+    window.themes = [...window.themes, ...customThemes];
+  } catch (err) {
+    console.warn("Failed to load custom themes:", err);
+  }
 }
 
 function saveCustomThemes() {
-  const customThemes = window.themes.filter(theme => !theme.isBuiltIn);
-  localStorage.setItem("spiro_custom_themes", JSON.stringify(customThemes));
+  try {
+    const customThemes = window.themes.filter(theme => !theme.isBuiltIn);
+    localStorage.setItem("spiro_custom_themes", JSON.stringify(customThemes));
+  } catch (err) {
+    console.warn("Failed to save custom themes:", err);
+  }
 }
 
 function populateThemes() {
   const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
     const currentVal = themeSelect.value;
-    themeSelect.innerHTML = ""; // Clear existing options
+    themeSelect.innerHTML = "";
     
     const customOption = document.createElement("option");
     customOption.value = "Custom";
@@ -658,21 +659,18 @@ function savePreset() {
       f2: params.f2,
       d1: params.d1,
       d2: params.d2,
-      isBuiltIn: false // Flag to distinguish custom themes
+      isBuiltIn: false
     };
 
     window.themes.push(newPreset);
-    saveCustomThemes(); // Save to localStorage
-    populateThemes(); // Update the dropdown
+    saveCustomThemes();
+    populateThemes();
     
-    // Select the new theme
     const themeSelect = document.getElementById("themeSelect");
     if (themeSelect) {
       themeSelect.value = name;
     }
 
-    // For now, I will just log the new preset to the console.
-    // Saving to themes.js is a bigger task.
     console.log("New preset saved:", newPreset);
     alert(`Preset '${name}' saved!`);
   }
@@ -683,7 +681,7 @@ let currentThemeName = "";
 
 function shuffleTheme() {
   if (!Array.isArray(window.themes) || window.themes.length === 0) return;
-  if (fadeState !== "none") return; // Prevent rapid-fire shuffles during fade
+  if (fadeState !== "none") return;
   nextTheme = window.themes[Math.floor(Math.random() * window.themes.length)];
   currentThemeName = nextTheme.name;
   fadeState = "fading-out";
