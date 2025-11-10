@@ -4,15 +4,17 @@ let theta = 0;
 let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
-let fadeState = "none"; // "none", "fading-out", "fading-in"
+let fadeState = "none";
 let fadeAlpha = 0;
 let autoPlayTimer = null;
 let autoPlayCountdown = 0;
-let listenerController = new AbortController(); // For cleanup
+let listenerController = new AbortController();
+
+// Auto-scale padding factor (0.75 = 25% padding on all sides)
+const AUTOSCALE_PADDING = 0.75;
 
 function randomizeParameters() {
-  // Randomly select curve types
-  const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse"];
+  const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse", "butterfly", "astroid", "bicorn", "freeth's nephroid", "cardioid"];
   const primaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
   const secondaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
   
@@ -48,9 +50,7 @@ function randomizeParameters() {
     d2: Math.random() * 0.005 + 0.0001
   };
 
-  if (!document.getElementById("autoScale")?.checked) {
-    nextTheme.scale = params.scale;
-  }
+  nextTheme.scale = params.scale;
   
   fadeState = "fading-out";
 }
@@ -90,6 +90,10 @@ function setupEventListeners() {
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
   document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
+  document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
+    autoAdjustScale();
+    resetSpirographs();
+  }, options);
 
   const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
@@ -110,7 +114,7 @@ function setupEventListeners() {
     }, options);
   }
 
-  const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "autoScale", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
+  const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
   const styleParams = ["animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread"];
 
   shapeParams.forEach(id => {
@@ -146,7 +150,15 @@ function setupEventListeners() {
   if (autoPlayCheckbox) {
     autoPlayCheckbox.addEventListener("change", () => {
       updateStyleParams();
+      const autoPlaySlider = document.getElementById("autoPlay-slider-container");
+      if (autoPlaySlider) {
+        autoPlaySlider.style.display = autoPlayCheckbox.checked ? "block" : "none";
+      }
     }, options);
+    const autoPlaySlider = document.getElementById("autoPlay-slider-container");
+    if (autoPlaySlider) {
+      autoPlaySlider.style.display = autoPlayCheckbox.checked ? "block" : "none";
+    }
   }
 }
 
@@ -242,14 +254,10 @@ function draw() {
   scale(params.scale);
   let drift = radians(0.01 * frameCount);
 
-  // Pre-calculate frameCount dependent parts of adjustments
-  const frameSin = frameCount * 0.002;
-  const frameCos = frameCount * 0.0015;
-
   for (let i = 0; i < params.numPoints; i++) {
     push();
     rotate((i * TWO_PI) / params.numPoints + drift);
-    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l, frameSin, frameCos);
+    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l);
     pop();
   }
   pop();
@@ -277,14 +285,14 @@ function draw() {
   drawingContext.shadowBlur = 0;
 }
 
-function drawCurve(index, layer, frameSinBase, frameCosBase) {
+function drawCurve(index, layer) {
   let outerRadius = params.outerRadius;
   let innerRadius = params.innerRadius;
   let centerSize = params.centerSize;
   let currentTheta = theta;
 
-  innerRadius += 20 * sin(frameSinBase + layer * 0.4);
-  centerSize += 15 * cos(frameCosBase + layer * 0.6);
+  innerRadius += 20 * sin(frameCount * 0.002 + layer * 0.4);
+  centerSize += 15 * cos(frameCount * 0.0015 + layer * 0.6);
 
   if (params.layerOffsetMode === "radius") outerRadius *= 1 + layer * params.layerOffsetAmount;
   else if (params.layerOffsetMode === "rotation") currentTheta += layer * params.layerOffsetAmount;
@@ -313,7 +321,7 @@ function drawCurve(index, layer, frameSinBase, frameCosBase) {
   if (!spirographs[index]) spirographs[index] = [];
   if (!spirographs[index][layer]) spirographs[index][layer] = [];
   const arr = spirographs[index][layer];
-  arr.push(createVector(x, y));
+  arr.push({ x, y });
   while (arr.length > params.trailLength) arr.shift();
 
   if (arr.length > 1) {
@@ -378,6 +386,26 @@ function computeCurve(type, t, outer, inner, center) {
   } else if (type === "ellipse") {
     x = outer * cos(t);
     y = inner * sin(t);
+  } else if (type === "butterfly") {
+    let scale = outer / 40;
+    t *= 2;
+    let p = (exp(cos(t)) - 2 * cos(4 * t) - pow(sin(t / 12), 5));
+    x = sin(t) * p * scale * 8;
+    y = -cos(t) * p * scale * 8;
+  } else if (type === "astroid") {
+    x = outer * pow(cos(t), 3);
+    y = outer * pow(sin(t), 3);
+  } else if (type === "bicorn") {
+    x = outer * cos(t);
+    y = outer * (pow(sin(t), 2)) / (2 + sin(t));
+  } else if (type === "freeth's nephroid") {
+    let k = inner / outer;
+    x = outer * (1 + k * sin(t/2)) * cos(t);
+    y = outer * (k + sin(t/2)) * sin(t);
+  } else if (type === "cardioid") {
+    let a = outer / 4;
+    x = a * (2 * cos(t) - cos(2*t));
+    y = a * (2 * sin(t) - sin(2*t));
   }
   return { x, y };
 }
@@ -409,10 +437,6 @@ function updateShapeParams() {
   params.f2 = parseFloat(get("f2")?.value || 3);
   params.d1 = parseFloat(get("d1")?.value || 0.0006);
   params.d2 = parseFloat(get("d2")?.value || 0.0008);
-
-  if (get("autoScale")?.checked) {
-    autoAdjustScale();
-  }
 
   updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
@@ -521,7 +545,12 @@ function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
     cycloid: ["innerRadius"],
     trochoid: ["innerRadius", "centerSize"],
     limacon: ["outerRadius", "innerRadius"],
-    ellipse: ["outerRadius", "innerRadius"]
+    ellipse: ["outerRadius", "innerRadius"],
+    butterfly: ["outerRadius"],
+    astroid: ["outerRadius"],
+    bicorn: ["outerRadius"],
+    "freeth's nephroid": ["outerRadius", "innerRadius"],
+    cardioid: ["outerRadius"]
   };
 
   const primaryVisibility = visibility[primaryCurveType] || [];
@@ -564,11 +593,22 @@ function autoAdjustScale() {
     maxRadius = outerRadius + innerRadius;
   } else if (curveType === "ellipse") {
     maxRadius = max(outerRadius, innerRadius);
+  } else if (curveType === "butterfly") {
+    maxRadius = outerRadius;
+  } else if (curveType === "astroid") {
+    maxRadius = outerRadius;
+  } else if (curveType === "bicorn") {
+    maxRadius = outerRadius;
+  } else if (curveType === "freeth's nephroid") {
+    maxRadius = outerRadius + innerRadius;
+  } else if (curveType === "cardioid") {
+    maxRadius = outerRadius;
   }
 
   if (maxRadius > 0) {
     const maxAllowedRadius = min(width, height) / 2;
-    const newScale = maxAllowedRadius / maxRadius;
+    // Apply padding factor (0.85 = 15% padding on all sides for breathing room)
+    const newScale = (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING;
     params.scale = newScale;
     document.getElementById("scale").value = newScale;
     const display = document.getElementById("scale-value");

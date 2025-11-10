@@ -30,6 +30,19 @@
           <button id="shuffleTheme">Shuffle Theme</button>
           <button id="savePreset">Save Preset</button>
         </div>
+        <div class="control-group">
+          <button id="autoScaleBtn">Auto Scale</button>
+        </div>
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="autoPlay"> Auto-play
+          </label>
+        </div>
+        <div class="control-group" id="autoPlay-slider-container">
+          <label for="autoPlayInterval">Interval (seconds) <span id="autoPlayInterval-value" class="value-display"></span></label>
+          <input id="autoPlayInterval" type="range" min="1" max="30" step="1" value="5">
+          <small>Next change in: <span id="autoPlayCountdown">--</span>s</small>
+        </div>
       </div>
     </div>
 
@@ -55,6 +68,11 @@
             <option value="trochoid">Trochoid</option>
             <option value="limacon">Limacon</option>
             <option value="ellipse">Ellipse</option>
+            <option value="butterfly">Butterfly</option>
+            <option value="astroid">Astroid</option>
+            <option value="bicorn">Bicorn</option>
+            <option value="freeth's nephroid">Freeth's Nephroid</option>
+            <option value="cardioid">Cardioid</option>
           </select>
         </div>
 
@@ -79,6 +97,11 @@
             <option value="trochoid">Trochoid</option>
             <option value="limacon">Limacon</option>
             <option value="ellipse">Ellipse</option>
+            <option value="butterfly">Butterfly</option>
+            <option value="astroid">Astroid</option>
+            <option value="bicorn">Bicorn</option>
+            <option value="freeth's nephroid">Freeth's Nephroid</option>
+            <option value="cardioid">Cardioid</option>
           </select>
         </div>
 
@@ -118,12 +141,6 @@
         <div class="control-group">
           <label for="scale">Scale <span id="scale-value" class="value-display"></span></label>
           <input id="scale" type="range" min="0.1" max="2" value="1" step="0.01">
-        </div>
-
-        <div class="control-group">
-          <label>
-            <input type="checkbox" id="autoScale"> Auto-adjust Scale
-          </label>
         </div>
       </div>
     </div>
@@ -182,18 +199,6 @@
         <div class="control-group">
           <label for="trailLength">Trail Length <span id="trailLength-value" class="value-display"></span></label>
           <input id="trailLength" type="range" min="10" max="400" step="1" value="50">
-        </div>
-
-        <div class="control-group">
-          <label>
-            <input type="checkbox" id="autoPlay"> Auto-play
-          </label>
-        </div>
-
-        <div class="control-group">
-          <label for="autoPlayInterval">Interval (seconds) <span id="autoPlayInterval-value" class="value-display"></span></label>
-          <input id="autoPlayInterval" type="range" min="1" max="30" step="1" value="5">
-          <small>Next change in: <span id="autoPlayCountdown">--</span>s</small>
         </div>
       </div>
     </div>
