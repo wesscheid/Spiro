@@ -242,10 +242,14 @@ function draw() {
   scale(params.scale);
   let drift = radians(0.01 * frameCount);
 
+  // Pre-calculate frameCount dependent parts of adjustments
+  const frameSin = frameCount * 0.002;
+  const frameCos = frameCount * 0.0015;
+
   for (let i = 0; i < params.numPoints; i++) {
     push();
     rotate((i * TWO_PI) / params.numPoints + drift);
-    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l);
+    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l, frameSin, frameCos);
     pop();
   }
   pop();
@@ -273,14 +277,14 @@ function draw() {
   drawingContext.shadowBlur = 0;
 }
 
-function drawCurve(index, layer) {
+function drawCurve(index, layer, frameSinBase, frameCosBase) {
   let outerRadius = params.outerRadius;
   let innerRadius = params.innerRadius;
   let centerSize = params.centerSize;
   let currentTheta = theta;
 
-  innerRadius += 20 * sin(frameCount * 0.002 + layer * 0.4);
-  centerSize += 15 * cos(frameCount * 0.0015 + layer * 0.6);
+  innerRadius += 20 * sin(frameSinBase + layer * 0.4);
+  centerSize += 15 * cos(frameCosBase + layer * 0.6);
 
   if (params.layerOffsetMode === "radius") outerRadius *= 1 + layer * params.layerOffsetAmount;
   else if (params.layerOffsetMode === "rotation") currentTheta += layer * params.layerOffsetAmount;
@@ -309,7 +313,7 @@ function drawCurve(index, layer) {
   if (!spirographs[index]) spirographs[index] = [];
   if (!spirographs[index][layer]) spirographs[index][layer] = [];
   const arr = spirographs[index][layer];
-  arr.push({ x, y });
+  arr.push(createVector(x, y));
   while (arr.length > params.trailLength) arr.shift();
 
   if (arr.length > 1) {
