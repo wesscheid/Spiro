@@ -4,54 +4,15 @@ let theta = 0;
 let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
-let fadeState = "none";
+let fadeState = "none"; // "none", "fading-out", "fading-in"
 let fadeAlpha = 0;
 let autoPlayTimer = null;
 let autoPlayCountdown = 0;
-let listenerController = new AbortController();
-
-// Cached DOM elements
-let fullscreenToggleBtn;
-let shuffleThemeBtn;
-let savePresetBtn;
-let autoScaleBtn;
-let themeSelect;
-let autoPlayCheckbox;
-let autoPlayIntervalSlider;
-let autoPlayIntervalValueDisplay;
-let autoPlayCountdownDisplay;
-let curveTypeSelect;
-let dualCurveModeCheckbox;
-let secondaryCurveSelect;
-let dualModeTypeSelect;
-let outerRadiusSlider;
-let innerRadiusSlider;
-let centerSizeSlider;
-let scaleSlider;
-let numPointsSlider;
-let numLayersSlider;
-let layerOffsetModeSelect;
-let layerOffsetAmountSlider;
-let reverseLayersCheckbox;
-let animSpeedSlider;
-let trailLengthSlider;
-let lineWeightSlider;
-let lineThinningSlider;
-let baseHueSlider;
-let colorSpreadSlider;
-let superformulaControls;
-let harmonographControls;
-let mSlider, n1Slider, n2Slider, n3Slider;
-let f1Slider, f2Slider, d1Slider, d2Slider;
-let controlsDiv;
-let canvasContainerDiv;
-let autoPlaySliderContainer;
-
-// Auto-scale padding factor (0.75 = 25% padding on all sides)
-const AUTOSCALE_PADDING = 0.75;
+let listenerController = new AbortController(); // For cleanup
 
 function randomizeParameters() {
-  const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse", "butterfly", "astroid", "bicorn", "freeth's nephroid", "cardioid"];
+  // Randomly select curve types
+  const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse"];
   const primaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
   const secondaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
   
@@ -87,7 +48,9 @@ function randomizeParameters() {
     d2: Math.random() * 0.005 + 0.0001
   };
 
-  nextTheme.scale = params.scale;
+  if (!document.getElementById("autoScale")?.checked) {
+    nextTheme.scale = params.scale;
+  }
   
   fadeState = "fading-out";
 }
@@ -111,49 +74,6 @@ function setup() {
 
   setupEventListeners();
 
-  // Cache DOM elements
-  fullscreenToggleBtn = document.getElementById("fullscreenToggle");
-  shuffleThemeBtn = document.getElementById("shuffleTheme");
-  savePresetBtn = document.getElementById("savePreset");
-  autoScaleBtn = document.getElementById("autoScaleBtn");
-  themeSelect = document.getElementById("themeSelect");
-  autoPlayCheckbox = document.getElementById("autoPlay");
-  autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
-  autoPlayIntervalValueDisplay = document.getElementById("autoPlayInterval-value");
-  autoPlayCountdownDisplay = document.getElementById("autoPlayCountdown");
-  curveTypeSelect = document.getElementById("curveType");
-  dualCurveModeCheckbox = document.getElementById("dualCurveMode");
-  secondaryCurveSelect = document.getElementById("secondaryCurve");
-  dualModeTypeSelect = document.getElementById("dualModeType");
-  outerRadiusSlider = document.getElementById("outerRadius");
-  innerRadiusSlider = document.getElementById("innerRadius");
-  centerSizeSlider = document.getElementById("centerSize");
-  scaleSlider = document.getElementById("scale");
-  numPointsSlider = document.getElementById("numPoints");
-  numLayersSlider = document.getElementById("numLayers");
-  layerOffsetModeSelect = document.getElementById("layerOffsetMode");
-  layerOffsetAmountSlider = document.getElementById("layerOffsetAmount");
-  reverseLayersCheckbox = document.getElementById("reverseLayers");
-  animSpeedSlider = document.getElementById("animSpeed");
-  trailLengthSlider = document.getElementById("trailLength");
-  lineWeightSlider = document.getElementById("lineWeight");
-  lineThinningSlider = document.getElementById("lineThinning");
-  baseHueSlider = document.getElementById("baseHue");
-  colorSpreadSlider = document.getElementById("colorSpread");
-  superformulaControls = document.getElementById("superformula-controls");
-  harmonographControls = document.getElementById("harmonograph-controls");
-  mSlider = document.getElementById("m");
-  n1Slider = document.getElementById("n1");
-  n2Slider = document.getElementById("n2");
-  n3Slider = document.getElementById("n3");
-  f1Slider = document.getElementById("f1");
-  f2Slider = document.getElementById("f2");
-  d1Slider = document.getElementById("d1");
-  d2Slider = document.getElementById("d2");
-  controlsDiv = document.getElementById("controls");
-  canvasContainerDiv = document.getElementById("canvas-container");
-  autoPlaySliderContainer = document.getElementById("autoPlay-slider-container");
-
   window.themes.forEach(t => t.isBuiltIn = true);
   loadCustomThemes();
   populateThemes();
@@ -167,102 +87,66 @@ function setup() {
 function setupEventListeners() {
   const options = { signal: listenerController.signal };
 
-  fullscreenToggleBtn?.addEventListener("click", toggleFullscreenCanvas, options);
-  shuffleThemeBtn?.addEventListener("click", shuffleTheme, options);
-  savePresetBtn?.addEventListener("click", savePreset, options);
-  autoScaleBtn?.addEventListener("click", () => {
-    autoAdjustScale();
-    resetSpirographs();
-  }, options);
+  document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
+  document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
+  document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
 
+  const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
     themeSelect.addEventListener("change", () => {
       applyTheme(themeSelect.value);
     }, options);
   }
 
+  const autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
   if (autoPlayIntervalSlider) {
     autoPlayIntervalSlider.addEventListener("input", () => {
-      if (autoPlayIntervalValueDisplay) {
-        autoPlayIntervalValueDisplay.textContent = autoPlayIntervalSlider.value;
+      const display = document.getElementById("autoPlayInterval-value");
+      if (display) {
+        display.textContent = autoPlayIntervalSlider.value;
       }
       params.autoPlayInterval = parseInt(autoPlayIntervalSlider.value, 10);
       resetAutoPlayTimer();
     }, options);
   }
 
-  const shapeParamElements = {
-    curveType: curveTypeSelect,
-    dualCurveMode: dualCurveModeCheckbox,
-    secondaryCurve: secondaryCurveSelect,
-    dualModeType: dualModeTypeSelect,
-    outerRadius: outerRadiusSlider,
-    innerRadius: innerRadiusSlider,
-    centerSize: centerSizeSlider,
-    numPoints: numPointsSlider,
-    scale: scaleSlider,
-    numLayers: numLayersSlider,
-    layerOffsetMode: layerOffsetModeSelect,
-    layerOffsetAmount: layerOffsetAmountSlider,
-    reverseLayers: reverseLayersCheckbox,
-    m: mSlider,
-    n1: n1Slider,
-    n2: n2Slider,
-    n3: n3Slider,
-    f1: f1Slider,
-    f2: f2Slider,
-    d1: d1Slider,
-    d2: d2Slider
-  };
+  const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "autoScale", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
+  const styleParams = ["animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread"];
 
-  const styleParamElements = {
-    animSpeed: animSpeedSlider,
-    trailLength: trailLengthSlider,
-    lineWeight: lineWeightSlider,
-    lineThinning: lineThinningSlider,
-    baseHue: baseHueSlider,
-    colorSpread: colorSpreadSlider
-  };
-
-  for (const id in shapeParamElements) {
-    const el = shapeParamElements[id];
+  shapeParams.forEach(id => {
+    const el = document.getElementById(id);
     if (el) {
       const eventType = el.type === "checkbox" ? "change" : "input";
       el.addEventListener(eventType, () => {
         updateShapeParams();
         resetSpirographs();
-        const display = document.getElementById(id + "-value"); // Still need to get the display span
+        const display = document.getElementById(id + "-value");
         if (display) {
           display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
         }
       }, options);
     }
-  }
+  });
 
-  for (const id in styleParamElements) {
-    const el = styleParamElements[id];
+  styleParams.forEach(id => {
+    const el = document.getElementById(id);
     if (el) {
       const eventType = el.type === "checkbox" ? "change" : "input";
       el.addEventListener(eventType, () => {
         updateStyleParams();
-        const display = document.getElementById(id + "-value"); // Still need to get the display span
+        const display = document.getElementById(id + "-value");
         if (display) {
           display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
         }
       }, options);
     }
-  }
+  });
 
+  const autoPlayCheckbox = document.getElementById("autoPlay");
   if (autoPlayCheckbox) {
     autoPlayCheckbox.addEventListener("change", () => {
       updateStyleParams();
-      if (autoPlaySliderContainer) {
-        autoPlaySliderContainer.style.display = autoPlayCheckbox.checked ? "block" : "none";
-      }
     }, options);
-    if (autoPlaySliderContainer) {
-      autoPlaySliderContainer.style.display = autoPlayCheckbox.checked ? "block" : "none";
-    }
   }
 }
 
@@ -494,73 +378,60 @@ function computeCurve(type, t, outer, inner, center) {
   } else if (type === "ellipse") {
     x = outer * cos(t);
     y = inner * sin(t);
-  } else if (type === "butterfly") {
-    let scale = outer / 40;
-    t *= 2;
-    let p = (exp(cos(t)) - 2 * cos(4 * t) - pow(sin(t / 12), 5));
-    x = sin(t) * p * scale * 8;
-    y = -cos(t) * p * scale * 8;
-  } else if (type === "astroid") {
-    x = outer * pow(cos(t), 3);
-    y = outer * pow(sin(t), 3);
-  } else if (type === "bicorn") {
-    x = outer * cos(t);
-    y = outer * (pow(sin(t), 2)) / (2 + sin(t));
-  } else if (type === "freeth's nephroid") {
-    let k = inner / outer;
-    x = outer * (1 + k * sin(t/2)) * cos(t);
-    y = outer * (k + sin(t/2)) * sin(t);
-  } else if (type === "cardioid") {
-    let a = outer / 4;
-    x = a * (2 * cos(t) - cos(2*t));
-    y = a * (2 * sin(t) - sin(2*t));
   }
   return { x, y };
 }
 
 function updateShapeParams() {
   currentThemeName = "Custom";
-  params.curveType = curveTypeSelect?.value || "hypotrochoid";
-  params.dualCurveMode = dualCurveModeCheckbox?.checked || false;
-  params.secondaryCurve = secondaryCurveSelect?.value || params.curveType;
-  params.dualModeType = dualModeTypeSelect?.value || "blend";
+  const get = id => document.getElementById(id);
+  params.curveType = get("curveType")?.value || "hypotrochoid";
+  params.dualCurveMode = get("dualCurveMode")?.checked || false;
+  params.secondaryCurve = get("secondaryCurve")?.value || params.curveType;
+  params.dualModeType = get("dualModeType")?.value || "blend";
 
-  params.outerRadius = parseFloat(outerRadiusSlider?.value || 180);
-  params.innerRadius = parseFloat(innerRadiusSlider?.value || 80);
-  params.centerSize = parseFloat(centerSizeSlider?.value || 60);
-  params.numPoints = parseInt(numPointsSlider?.value || 12, 10);
-  params.scale = parseFloat(scaleSlider?.value || 1.0);
-  params.numLayers = parseInt(numLayersSlider?.value || 2, 10);
-  params.layerOffsetMode = layerOffsetModeSelect?.value || "radius";
-  params.layerOffsetAmount = parseFloat(layerOffsetAmountSlider?.value || 0.06);
-  params.reverseLayers = reverseLayersCheckbox?.checked || false;
+  params.outerRadius = parseFloat(get("outerRadius")?.value || 180);
+  params.innerRadius = parseFloat(get("innerRadius")?.value || 80);
+  params.centerSize = parseFloat(get("centerSize")?.value || 60);
+  params.numPoints = parseInt(get("numPoints")?.value || 12, 10);
+  params.scale = parseFloat(get("scale")?.value || 1.0);
+  params.numLayers = parseInt(get("numLayers")?.value || 2, 10);
+  params.layerOffsetMode = get("layerOffsetMode")?.value || "radius";
+  params.layerOffsetAmount = parseFloat(get("layerOffsetAmount")?.value || 0.06);
+  params.reverseLayers = get("reverseLayers")?.checked || false;
 
-  params.m = parseFloat(mSlider?.value || 6);
-  params.n1 = parseFloat(n1Slider?.value || 0.3);
-  params.n2 = parseFloat(n2Slider?.value || 1.7);
-  params.n3 = parseFloat(n3Slider?.value || 1.7);
+  params.m = parseFloat(get("m")?.value || 6);
+  params.n1 = parseFloat(get("n1")?.value || 0.3);
+  params.n2 = parseFloat(get("n2")?.value || 1.7);
+  params.n3 = parseFloat(get("n3")?.value || 1.7);
 
-  params.f1 = parseFloat(f1Slider?.value || 2);
-  params.f2 = parseFloat(f2Slider?.value || 3);
-  params.d1 = parseFloat(d1Slider?.value || 0.0006);
-  params.d2 = parseFloat(d2Slider?.value || 0.0008);
+  params.f1 = parseFloat(get("f1")?.value || 2);
+  params.f2 = parseFloat(get("f2")?.value || 3);
+  params.d1 = parseFloat(get("d1")?.value || 0.0006);
+  params.d2 = parseFloat(get("d2")?.value || 0.0008);
+
+  if (get("autoScale")?.checked) {
+    autoAdjustScale();
+  }
 
   updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
 function updateStyleParams() {
   currentThemeName = "Custom";
-  params.animSpeed = parseFloat(animSpeedSlider?.value || 0.02);
-  params.trailLength = parseInt(trailLengthSlider?.value || 120, 10);
-  params.lineWeight = parseFloat(lineWeightSlider?.value || 1.6);
-  params.lineThinning = parseFloat(lineThinningSlider?.value || 0.7);
-  params.baseHue = parseFloat(baseHueSlider?.value || 260);
-  params.colorSpread = parseFloat(colorSpreadSlider?.value || 120);
-  params.autoPlay = autoPlayCheckbox?.checked || false;
-  params.autoPlayInterval = parseInt(autoPlayIntervalSlider?.value || 5, 10);
+  const get = id => document.getElementById(id);
+  params.animSpeed = parseFloat(get("animSpeed")?.value || 0.02);
+  params.trailLength = parseInt(get("trailLength")?.value || 120, 10);
+  params.lineWeight = parseFloat(get("lineWeight")?.value || 1.6);
+  params.lineThinning = parseFloat(get("lineThinning")?.value || 0.7);
+  params.baseHue = parseFloat(get("baseHue")?.value || 260);
+  params.colorSpread = parseFloat(get("colorSpread")?.value || 120);
+  params.autoPlay = get("autoPlay")?.checked || false;
+  params.autoPlayInterval = parseInt(get("autoPlayInterval")?.value || 5, 10);
 
-  if (autoPlayIntervalValueDisplay) {
-    autoPlayIntervalValueDisplay.textContent = params.autoPlayInterval;
+  const autoPlayIntervalDisplay = document.getElementById("autoPlayInterval-value");
+  if (autoPlayIntervalDisplay) {
+    autoPlayIntervalDisplay.textContent = params.autoPlayInterval;
   }
 
   resetAutoPlayTimer();
@@ -598,27 +469,28 @@ function updateCountdown() {
 }
 
 function updateUIFromParams() {
-  curveTypeSelect.value = params.curveType;
-  dualCurveModeCheckbox.checked = params.dualCurveMode;
-  secondaryCurveSelect.value = params.secondaryCurve;
-  dualModeTypeSelect.value = params.dualModeType;
+  const get = id => document.getElementById(id);
+  get("curveType").value = params.curveType;
+  get("dualCurveMode").checked = params.dualCurveMode;
+  get("secondaryCurve").value = params.secondaryCurve;
+  get("dualModeType").value = params.dualModeType;
 
-  outerRadiusSlider.value = params.outerRadius;
-  innerRadiusSlider.value = params.innerRadius;
-  centerSizeSlider.value = params.centerSize;
-  numPointsSlider.value = params.numPoints;
-  scaleSlider.value = params.scale;
-  numLayersSlider.value = params.numLayers;
-  layerOffsetModeSelect.value = params.layerOffsetMode;
-  layerOffsetAmountSlider.value = params.layerOffsetAmount;
-  reverseLayersCheckbox.checked = params.reverseLayers;
+  get("outerRadius").value = params.outerRadius;
+  get("innerRadius").value = params.innerRadius;
+  get("centerSize").value = params.centerSize;
+  get("numPoints").value = params.numPoints;
+  get("scale").value = params.scale;
+  get("numLayers").value = params.numLayers;
+  get("layerOffsetMode").value = params.layerOffsetMode;
+  get("layerOffsetAmount").value = params.layerOffsetAmount;
+  get("reverseLayers").checked = params.reverseLayers;
 
-  animSpeedSlider.value = params.animSpeed;
-  trailLengthSlider.value = params.trailLength;
-  lineWeightSlider.value = params.lineWeight;
-  lineThinningSlider.value = params.lineThinning;
-  baseHueSlider.value = params.baseHue;
-  colorSpreadSlider.value = params.colorSpread;
+  get("animSpeed").value = params.animSpeed;
+  get("trailLength").value = params.trailLength;
+  get("lineWeight").value = params.lineWeight;
+  get("lineThinning").value = params.lineThinning;
+  get("baseHue").value = params.baseHue;
+  get("colorSpread").value = params.colorSpread;
 
   document.querySelectorAll("input[type=range]").forEach(input => {
     const display = document.getElementById(input.id + "-value");
@@ -630,11 +502,11 @@ function updateUIFromParams() {
 
 function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
   const controls = {
-    outerRadius: outerRadiusSlider.parentElement,
-    innerRadius: innerRadiusSlider.parentElement,
-    centerSize: centerSizeSlider.parentElement,
-    superformula: superformulaControls,
-    harmonograph: harmonographControls
+    outerRadius: document.getElementById("outerRadius").parentElement,
+    innerRadius: document.getElementById("innerRadius").parentElement,
+    centerSize: document.getElementById("centerSize").parentElement,
+    superformula: document.getElementById("superformula-controls"),
+    harmonograph: document.getElementById("harmonograph-controls")
   };
 
   const visibility = {
@@ -649,16 +521,11 @@ function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
     cycloid: ["innerRadius"],
     trochoid: ["innerRadius", "centerSize"],
     limacon: ["outerRadius", "innerRadius"],
-    ellipse: ["outerRadius", "innerRadius"],
-    butterfly: ["outerRadius"],
-    astroid: ["outerRadius"],
-    bicorn: ["outerRadius"],
-    "freeth's nephroid": ["outerRadius", "innerRadius"],
-    cardioid: ["outerRadius"]
+    ellipse: ["outerRadius", "innerRadius"]
   };
 
   const primaryVisibility = visibility[primaryCurveType] || [];
-  const secondaryVisibility = dualCurveModeCheckbox.checked && visibility[secondaryCurveType] ? visibility[secondaryCurveType] : [];
+  const secondaryVisibility = document.getElementById("dualCurveMode").checked && visibility[secondaryCurveType] ? visibility[secondaryCurveType] : [];
 
   Object.keys(controls).forEach(key => {
     if (primaryVisibility.includes(key) || secondaryVisibility.includes(key)) {
@@ -697,24 +564,13 @@ function autoAdjustScale() {
     maxRadius = outerRadius + innerRadius;
   } else if (curveType === "ellipse") {
     maxRadius = max(outerRadius, innerRadius);
-  } else if (curveType === "butterfly") {
-    maxRadius = outerRadius;
-  } else if (curveType === "astroid") {
-    maxRadius = outerRadius;
-  } else if (curveType === "bicorn") {
-    maxRadius = outerRadius;
-  } else if (curveType === "freeth's nephroid") {
-    maxRadius = outerRadius + innerRadius;
-  } else if (curveType === "cardioid") {
-    maxRadius = outerRadius;
   }
 
   if (maxRadius > 0) {
     const maxAllowedRadius = min(width, height) / 2;
-    // Apply padding factor (0.85 = 15% padding on all sides for breathing room)
-    const newScale = (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING;
+    const newScale = maxAllowedRadius / maxRadius;
     params.scale = newScale;
-    scaleSlider.value = newScale;
+    document.getElementById("scale").value = newScale;
     const display = document.getElementById("scale-value");
     if (display) {
       display.textContent = newScale.toFixed(2);
@@ -741,6 +597,7 @@ function saveCustomThemes() {
 }
 
 function populateThemes() {
+  const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
     const currentVal = themeSelect.value;
     themeSelect.innerHTML = "";
@@ -813,6 +670,7 @@ function savePreset() {
     saveCustomThemes();
     populateThemes();
     
+    const themeSelect = document.getElementById("themeSelect");
     if (themeSelect) {
       themeSelect.value = name;
     }
@@ -834,11 +692,15 @@ function shuffleTheme() {
 }
 
 function toggleFullscreenCanvas() {
+  const container = document.getElementById("canvas-container");
+  const controls = document.getElementById("controls");
+  const button = document.getElementById("fullscreenToggle");
+
   if (!document.fullscreenElement) {
-    canvasContainerDiv?.requestFullscreen().then(() => {
+    container?.requestFullscreen().then(() => {
       fullscreenMode = true;
-      if (controlsDiv) controlsDiv.style.display = "none";
-      if (fullscreenToggleBtn) fullscreenToggleBtn.innerHTML = "&#x2715;";
+      if (controls) controls.style.display = "none";
+      if (button) button.innerHTML = "&#x2715;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
       clearSpirographs();
@@ -846,8 +708,8 @@ function toggleFullscreenCanvas() {
   } else {
     document.exitFullscreen().then(() => {
       fullscreenMode = false;
-      if (controlsDiv) controlsDiv.style.display = "block";
-      if (fullscreenToggleBtn) fullscreenToggleBtn.innerHTML = "&#x26F6;";
+      if (controls) controls.style.display = "block";
+      if (button) button.innerHTML = "&#x26F6;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
       clearSpirographs();
@@ -856,11 +718,13 @@ function toggleFullscreenCanvas() {
 }
 
 document.addEventListener("fullscreenchange", () => {
+  const controls = document.getElementById("controls");
+  const button = document.getElementById("fullscreenToggle");
   fullscreenMode = !!document.fullscreenElement;
-  if (controlsDiv) controlsDiv.style.display = fullscreenMode ? "none" : "block";
-  if (fullscreenToggleBtn) {
-    fullscreenToggleBtn.style.display = "block";
-    fullscreenToggleBtn.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
+  if (controls) controls.style.display = fullscreenMode ? "none" : "block";
+  if (button) {
+    button.style.display = "block";
+    button.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
   }
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
