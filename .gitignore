@@ -2,3 +2,4 @@
 gha-creds-*.json
 *.identifier
 /.github/workflows
+gemini.md
