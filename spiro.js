@@ -10,6 +10,43 @@ let autoPlayTimer = null;
 let autoPlayCountdown = 0;
 let listenerController = new AbortController();
 
+// Cached DOM elements
+let fullscreenToggleBtn;
+let shuffleThemeBtn;
+let savePresetBtn;
+let autoScaleBtn;
+let themeSelect;
+let autoPlayCheckbox;
+let autoPlayIntervalSlider;
+let autoPlayIntervalValueDisplay;
+let autoPlayCountdownDisplay;
+let curveTypeSelect;
+let dualCurveModeCheckbox;
+let secondaryCurveSelect;
+let dualModeTypeSelect;
+let outerRadiusSlider;
+let innerRadiusSlider;
+let centerSizeSlider;
+let scaleSlider;
+let numPointsSlider;
+let numLayersSlider;
+let layerOffsetModeSelect;
+let layerOffsetAmountSlider;
+let reverseLayersCheckbox;
+let animSpeedSlider;
+let trailLengthSlider;
+let lineWeightSlider;
+let lineThinningSlider;
+let baseHueSlider;
+let colorSpreadSlider;
+let superformulaControls;
+let harmonographControls;
+let mSlider, n1Slider, n2Slider, n3Slider;
+let f1Slider, f2Slider, d1Slider, d2Slider;
+let controlsDiv;
+let canvasContainerDiv;
+let autoPlaySliderContainer;
+
 // Auto-scale padding factor (0.75 = 25% padding on all sides)
 const AUTOSCALE_PADDING = 0.75;
 
@@ -74,6 +111,49 @@ function setup() {
 
   setupEventListeners();
 
+  // Cache DOM elements
+  fullscreenToggleBtn = document.getElementById("fullscreenToggle");
+  shuffleThemeBtn = document.getElementById("shuffleTheme");
+  savePresetBtn = document.getElementById("savePreset");
+  autoScaleBtn = document.getElementById("autoScaleBtn");
+  themeSelect = document.getElementById("themeSelect");
+  autoPlayCheckbox = document.getElementById("autoPlay");
+  autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
+  autoPlayIntervalValueDisplay = document.getElementById("autoPlayInterval-value");
+  autoPlayCountdownDisplay = document.getElementById("autoPlayCountdown");
+  curveTypeSelect = document.getElementById("curveType");
+  dualCurveModeCheckbox = document.getElementById("dualCurveMode");
+  secondaryCurveSelect = document.getElementById("secondaryCurve");
+  dualModeTypeSelect = document.getElementById("dualModeType");
+  outerRadiusSlider = document.getElementById("outerRadius");
+  innerRadiusSlider = document.getElementById("innerRadius");
+  centerSizeSlider = document.getElementById("centerSize");
+  scaleSlider = document.getElementById("scale");
+  numPointsSlider = document.getElementById("numPoints");
+  numLayersSlider = document.getElementById("numLayers");
+  layerOffsetModeSelect = document.getElementById("layerOffsetMode");
+  layerOffsetAmountSlider = document.getElementById("layerOffsetAmount");
+  reverseLayersCheckbox = document.getElementById("reverseLayers");
+  animSpeedSlider = document.getElementById("animSpeed");
+  trailLengthSlider = document.getElementById("trailLength");
+  lineWeightSlider = document.getElementById("lineWeight");
+  lineThinningSlider = document.getElementById("lineThinning");
+  baseHueSlider = document.getElementById("baseHue");
+  colorSpreadSlider = document.getElementById("colorSpread");
+  superformulaControls = document.getElementById("superformula-controls");
+  harmonographControls = document.getElementById("harmonograph-controls");
+  mSlider = document.getElementById("m");
+  n1Slider = document.getElementById("n1");
+  n2Slider = document.getElementById("n2");
+  n3Slider = document.getElementById("n3");
+  f1Slider = document.getElementById("f1");
+  f2Slider = document.getElementById("f2");
+  d1Slider = document.getElementById("d1");
+  d2Slider = document.getElementById("d2");
+  controlsDiv = document.getElementById("controls");
+  canvasContainerDiv = document.getElementById("canvas-container");
+  autoPlaySliderContainer = document.getElementById("autoPlay-slider-container");
+
   window.themes.forEach(t => t.isBuiltIn = true);
   loadCustomThemes();
   populateThemes();
@@ -87,77 +167,101 @@ function setup() {
 function setupEventListeners() {
   const options = { signal: listenerController.signal };
 
-  document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
-  document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
-  document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
-  document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
+  fullscreenToggleBtn?.addEventListener("click", toggleFullscreenCanvas, options);
+  shuffleThemeBtn?.addEventListener("click", shuffleTheme, options);
+  savePresetBtn?.addEventListener("click", savePreset, options);
+  autoScaleBtn?.addEventListener("click", () => {
     autoAdjustScale();
     resetSpirographs();
   }, options);
 
-  const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
     themeSelect.addEventListener("change", () => {
       applyTheme(themeSelect.value);
     }, options);
   }
 
-  const autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
   if (autoPlayIntervalSlider) {
     autoPlayIntervalSlider.addEventListener("input", () => {
-      const display = document.getElementById("autoPlayInterval-value");
-      if (display) {
-        display.textContent = autoPlayIntervalSlider.value;
+      if (autoPlayIntervalValueDisplay) {
+        autoPlayIntervalValueDisplay.textContent = autoPlayIntervalSlider.value;
       }
       params.autoPlayInterval = parseInt(autoPlayIntervalSlider.value, 10);
       resetAutoPlayTimer();
     }, options);
   }
 
-  const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
-  const styleParams = ["animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread"];
+  const shapeParamElements = {
+    curveType: curveTypeSelect,
+    dualCurveMode: dualCurveModeCheckbox,
+    secondaryCurve: secondaryCurveSelect,
+    dualModeType: dualModeTypeSelect,
+    outerRadius: outerRadiusSlider,
+    innerRadius: innerRadiusSlider,
+    centerSize: centerSizeSlider,
+    numPoints: numPointsSlider,
+    scale: scaleSlider,
+    numLayers: numLayersSlider,
+    layerOffsetMode: layerOffsetModeSelect,
+    layerOffsetAmount: layerOffsetAmountSlider,
+    reverseLayers: reverseLayersCheckbox,
+    m: mSlider,
+    n1: n1Slider,
+    n2: n2Slider,
+    n3: n3Slider,
+    f1: f1Slider,
+    f2: f2Slider,
+    d1: d1Slider,
+    d2: d2Slider
+  };
 
-  shapeParams.forEach(id => {
-    const el = document.getElementById(id);
+  const styleParamElements = {
+    animSpeed: animSpeedSlider,
+    trailLength: trailLengthSlider,
+    lineWeight: lineWeightSlider,
+    lineThinning: lineThinningSlider,
+    baseHue: baseHueSlider,
+    colorSpread: colorSpreadSlider
+  };
+
+  for (const id in shapeParamElements) {
+    const el = shapeParamElements[id];
     if (el) {
       const eventType = el.type === "checkbox" ? "change" : "input";
       el.addEventListener(eventType, () => {
         updateShapeParams();
         resetSpirographs();
-        const display = document.getElementById(id + "-value");
+        const display = document.getElementById(id + "-value"); // Still need to get the display span
         if (display) {
           display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
         }
       }, options);
     }
-  });
+  }
 
-  styleParams.forEach(id => {
-    const el = document.getElementById(id);
+  for (const id in styleParamElements) {
+    const el = styleParamElements[id];
     if (el) {
       const eventType = el.type === "checkbox" ? "change" : "input";
       el.addEventListener(eventType, () => {
         updateStyleParams();
-        const display = document.getElementById(id + "-value");
+        const display = document.getElementById(id + "-value"); // Still need to get the display span
         if (display) {
           display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
         }
       }, options);
     }
-  });
+  }
 
-  const autoPlayCheckbox = document.getElementById("autoPlay");
   if (autoPlayCheckbox) {
     autoPlayCheckbox.addEventListener("change", () => {
       updateStyleParams();
-      const autoPlaySlider = document.getElementById("autoPlay-slider-container");
-      if (autoPlaySlider) {
-        autoPlaySlider.style.display = autoPlayCheckbox.checked ? "block" : "none";
+      if (autoPlaySliderContainer) {
+        autoPlaySliderContainer.style.display = autoPlayCheckbox.checked ? "block" : "none";
       }
     }, options);
-    const autoPlaySlider = document.getElementById("autoPlay-slider-container");
-    if (autoPlaySlider) {
-      autoPlaySlider.style.display = autoPlayCheckbox.checked ? "block" : "none";
+    if (autoPlaySliderContainer) {
+      autoPlaySliderContainer.style.display = autoPlayCheckbox.checked ? "block" : "none";
     }
   }
 }
@@ -254,10 +358,14 @@ function draw() {
   scale(params.scale);
   let drift = radians(0.01 * frameCount);
 
+  // Pre-calculate frameCount dependent parts of adjustments
+  const frameSin = frameCount * 0.002;
+  const frameCos = frameCount * 0.0015;
+
   for (let i = 0; i < params.numPoints; i++) {
     push();
     rotate((i * TWO_PI) / params.numPoints + drift);
-    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l);
+    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l, frameSin, frameCos);
     pop();
   }
   pop();
@@ -285,14 +393,14 @@ function draw() {
   drawingContext.shadowBlur = 0;
 }
 
-function drawCurve(index, layer) {
+function drawCurve(index, layer, frameSinBase, frameCosBase) {
   let outerRadius = params.outerRadius;
   let innerRadius = params.innerRadius;
   let centerSize = params.centerSize;
   let currentTheta = theta;
 
-  innerRadius += 20 * sin(frameCount * 0.002 + layer * 0.4);
-  centerSize += 15 * cos(frameCount * 0.0015 + layer * 0.6);
+  innerRadius += 20 * sin(frameSinBase + layer * 0.4);
+  centerSize += 15 * cos(frameCosBase + layer * 0.6);
 
   if (params.layerOffsetMode === "radius") outerRadius *= 1 + layer * params.layerOffsetAmount;
   else if (params.layerOffsetMode === "rotation") currentTheta += layer * params.layerOffsetAmount;
@@ -321,7 +429,7 @@ function drawCurve(index, layer) {
   if (!spirographs[index]) spirographs[index] = [];
   if (!spirographs[index][layer]) spirographs[index][layer] = [];
   const arr = spirographs[index][layer];
-  arr.push({ x, y });
+  arr.push(createVector(x, y));
   while (arr.length > params.trailLength) arr.shift();
 
   if (arr.length > 1) {
