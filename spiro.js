@@ -520,50 +520,47 @@ function computeCurve(type, t, outer, inner, center) {
 
 function updateShapeParams() {
   currentThemeName = "Custom";
-  const get = id => document.getElementById(id);
-  params.curveType = get("curveType")?.value || "hypotrochoid";
-  params.dualCurveMode = get("dualCurveMode")?.checked || false;
-  params.secondaryCurve = get("secondaryCurve")?.value || params.curveType;
-  params.dualModeType = get("dualModeType")?.value || "blend";
+  params.curveType = curveTypeSelect?.value || "hypotrochoid";
+  params.dualCurveMode = dualCurveModeCheckbox?.checked || false;
+  params.secondaryCurve = secondaryCurveSelect?.value || params.curveType;
+  params.dualModeType = dualModeTypeSelect?.value || "blend";
 
-  params.outerRadius = parseFloat(get("outerRadius")?.value || 180);
-  params.innerRadius = parseFloat(get("innerRadius")?.value || 80);
-  params.centerSize = parseFloat(get("centerSize")?.value || 60);
-  params.numPoints = parseInt(get("numPoints")?.value || 12, 10);
-  params.scale = parseFloat(get("scale")?.value || 1.0);
-  params.numLayers = parseInt(get("numLayers")?.value || 2, 10);
-  params.layerOffsetMode = get("layerOffsetMode")?.value || "radius";
-  params.layerOffsetAmount = parseFloat(get("layerOffsetAmount")?.value || 0.06);
-  params.reverseLayers = get("reverseLayers")?.checked || false;
+  params.outerRadius = parseFloat(outerRadiusSlider?.value || 180);
+  params.innerRadius = parseFloat(innerRadiusSlider?.value || 80);
+  params.centerSize = parseFloat(centerSizeSlider?.value || 60);
+  params.numPoints = parseInt(numPointsSlider?.value || 12, 10);
+  params.scale = parseFloat(scaleSlider?.value || 1.0);
+  params.numLayers = parseInt(numLayersSlider?.value || 2, 10);
+  params.layerOffsetMode = layerOffsetModeSelect?.value || "radius";
+  params.layerOffsetAmount = parseFloat(layerOffsetAmountSlider?.value || 0.06);
+  params.reverseLayers = reverseLayersCheckbox?.checked || false;
 
-  params.m = parseFloat(get("m")?.value || 6);
-  params.n1 = parseFloat(get("n1")?.value || 0.3);
-  params.n2 = parseFloat(get("n2")?.value || 1.7);
-  params.n3 = parseFloat(get("n3")?.value || 1.7);
+  params.m = parseFloat(mSlider?.value || 6);
+  params.n1 = parseFloat(n1Slider?.value || 0.3);
+  params.n2 = parseFloat(n2Slider?.value || 1.7);
+  params.n3 = parseFloat(n3Slider?.value || 1.7);
 
-  params.f1 = parseFloat(get("f1")?.value || 2);
-  params.f2 = parseFloat(get("f2")?.value || 3);
-  params.d1 = parseFloat(get("d1")?.value || 0.0006);
-  params.d2 = parseFloat(get("d2")?.value || 0.0008);
+  params.f1 = parseFloat(f1Slider?.value || 2);
+  params.f2 = parseFloat(f2Slider?.value || 3);
+  params.d1 = parseFloat(d1Slider?.value || 0.0006);
+  params.d2 = parseFloat(d2Slider?.value || 0.0008);
 
   updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
 function updateStyleParams() {
   currentThemeName = "Custom";
-  const get = id => document.getElementById(id);
-  params.animSpeed = parseFloat(get("animSpeed")?.value || 0.02);
-  params.trailLength = parseInt(get("trailLength")?.value || 120, 10);
-  params.lineWeight = parseFloat(get("lineWeight")?.value || 1.6);
-  params.lineThinning = parseFloat(get("lineThinning")?.value || 0.7);
-  params.baseHue = parseFloat(get("baseHue")?.value || 260);
-  params.colorSpread = parseFloat(get("colorSpread")?.value || 120);
-  params.autoPlay = get("autoPlay")?.checked || false;
-  params.autoPlayInterval = parseInt(get("autoPlayInterval")?.value || 5, 10);
+  params.animSpeed = parseFloat(animSpeedSlider?.value || 0.02);
+  params.trailLength = parseInt(trailLengthSlider?.value || 120, 10);
+  params.lineWeight = parseFloat(lineWeightSlider?.value || 1.6);
+  params.lineThinning = parseFloat(lineThinningSlider?.value || 0.7);
+  params.baseHue = parseFloat(baseHueSlider?.value || 260);
+  params.colorSpread = parseFloat(colorSpreadSlider?.value || 120);
+  params.autoPlay = autoPlayCheckbox?.checked || false;
+  params.autoPlayInterval = parseInt(autoPlayIntervalSlider?.value || 5, 10);
 
-  const autoPlayIntervalDisplay = document.getElementById("autoPlayInterval-value");
-  if (autoPlayIntervalDisplay) {
-    autoPlayIntervalDisplay.textContent = params.autoPlayInterval;
+  if (autoPlayIntervalValueDisplay) {
+    autoPlayIntervalValueDisplay.textContent = params.autoPlayInterval;
   }
 
   resetAutoPlayTimer();
@@ -601,28 +598,27 @@ function updateCountdown() {
 }
 
 function updateUIFromParams() {
-  const get = id => document.getElementById(id);
-  get("curveType").value = params.curveType;
-  get("dualCurveMode").checked = params.dualCurveMode;
-  get("secondaryCurve").value = params.secondaryCurve;
-  get("dualModeType").value = params.dualModeType;
+  curveTypeSelect.value = params.curveType;
+  dualCurveModeCheckbox.checked = params.dualCurveMode;
+  secondaryCurveSelect.value = params.secondaryCurve;
+  dualModeTypeSelect.value = params.dualModeType;
 
-  get("outerRadius").value = params.outerRadius;
-  get("innerRadius").value = params.innerRadius;
-  get("centerSize").value = params.centerSize;
-  get("numPoints").value = params.numPoints;
-  get("scale").value = params.scale;
-  get("numLayers").value = params.numLayers;
-  get("layerOffsetMode").value = params.layerOffsetMode;
-  get("layerOffsetAmount").value = params.layerOffsetAmount;
-  get("reverseLayers").checked = params.reverseLayers;
+  outerRadiusSlider.value = params.outerRadius;
+  innerRadiusSlider.value = params.innerRadius;
+  centerSizeSlider.value = params.centerSize;
+  numPointsSlider.value = params.numPoints;
+  scaleSlider.value = params.scale;
+  numLayersSlider.value = params.numLayers;
+  layerOffsetModeSelect.value = params.layerOffsetMode;
+  layerOffsetAmountSlider.value = params.layerOffsetAmount;
+  reverseLayersCheckbox.checked = params.reverseLayers;
 
-  get("animSpeed").value = params.animSpeed;
-  get("trailLength").value = params.trailLength;
-  get("lineWeight").value = params.lineWeight;
-  get("lineThinning").value = params.lineThinning;
-  get("baseHue").value = params.baseHue;
-  get("colorSpread").value = params.colorSpread;
+  animSpeedSlider.value = params.animSpeed;
+  trailLengthSlider.value = params.trailLength;
+  lineWeightSlider.value = params.lineWeight;
+  lineThinningSlider.value = params.lineThinning;
+  baseHueSlider.value = params.baseHue;
+  colorSpreadSlider.value = params.colorSpread;
 
   document.querySelectorAll("input[type=range]").forEach(input => {
     const display = document.getElementById(input.id + "-value");
@@ -634,11 +630,11 @@ function updateUIFromParams() {
 
 function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
   const controls = {
-    outerRadius: document.getElementById("outerRadius").parentElement,
-    innerRadius: document.getElementById("innerRadius").parentElement,
-    centerSize: document.getElementById("centerSize").parentElement,
-    superformula: document.getElementById("superformula-controls"),
-    harmonograph: document.getElementById("harmonograph-controls")
+    outerRadius: outerRadiusSlider.parentElement,
+    innerRadius: innerRadiusSlider.parentElement,
+    centerSize: centerSizeSlider.parentElement,
+    superformula: superformulaControls,
+    harmonograph: harmonographControls
   };
 
   const visibility = {
@@ -662,7 +658,7 @@ function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
   };
 
   const primaryVisibility = visibility[primaryCurveType] || [];
-  const secondaryVisibility = document.getElementById("dualCurveMode").checked && visibility[secondaryCurveType] ? visibility[secondaryCurveType] : [];
+  const secondaryVisibility = dualCurveModeCheckbox.checked && visibility[secondaryCurveType] ? visibility[secondaryCurveType] : [];
 
   Object.keys(controls).forEach(key => {
     if (primaryVisibility.includes(key) || secondaryVisibility.includes(key)) {
@@ -718,7 +714,7 @@ function autoAdjustScale() {
     // Apply padding factor (0.85 = 15% padding on all sides for breathing room)
     const newScale = (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING;
     params.scale = newScale;
-    document.getElementById("scale").value = newScale;
+    scaleSlider.value = newScale;
     const display = document.getElementById("scale-value");
     if (display) {
       display.textContent = newScale.toFixed(2);
@@ -745,7 +741,6 @@ function saveCustomThemes() {
 }
 
 function populateThemes() {
-  const themeSelect = document.getElementById("themeSelect");
   if (themeSelect) {
     const currentVal = themeSelect.value;
     themeSelect.innerHTML = "";
@@ -818,7 +813,6 @@ function savePreset() {
     saveCustomThemes();
     populateThemes();
     
-    const themeSelect = document.getElementById("themeSelect");
     if (themeSelect) {
       themeSelect.value = name;
     }
@@ -840,15 +834,11 @@ function shuffleTheme() {
 }
 
 function toggleFullscreenCanvas() {
-  const container = document.getElementById("canvas-container");
-  const controls = document.getElementById("controls");
-  const button = document.getElementById("fullscreenToggle");
-
   if (!document.fullscreenElement) {
-    container?.requestFullscreen().then(() => {
+    canvasContainerDiv?.requestFullscreen().then(() => {
       fullscreenMode = true;
-      if (controls) controls.style.display = "none";
-      if (button) button.innerHTML = "&#x2715;";
+      if (controlsDiv) controlsDiv.style.display = "none";
+      if (fullscreenToggleBtn) fullscreenToggleBtn.innerHTML = "&#x2715;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
       clearSpirographs();
@@ -856,8 +846,8 @@ function toggleFullscreenCanvas() {
   } else {
     document.exitFullscreen().then(() => {
       fullscreenMode = false;
-      if (controls) controls.style.display = "block";
-      if (button) button.innerHTML = "&#x26F6;";
+      if (controlsDiv) controlsDiv.style.display = "block";
+      if (fullscreenToggleBtn) fullscreenToggleBtn.innerHTML = "&#x26F6;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
       clearSpirographs();
@@ -866,13 +856,11 @@ function toggleFullscreenCanvas() {
 }
 
 document.addEventListener("fullscreenchange", () => {
-  const controls = document.getElementById("controls");
-  const button = document.getElementById("fullscreenToggle");
   fullscreenMode = !!document.fullscreenElement;
-  if (controls) controls.style.display = fullscreenMode ? "none" : "block";
-  if (button) {
-    button.style.display = "block";
-    button.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
+  if (controlsDiv) controlsDiv.style.display = fullscreenMode ? "none" : "block";
+  if (fullscreenToggleBtn) {
+    fullscreenToggleBtn.style.display = "block";
+    fullscreenToggleBtn.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
   }
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
