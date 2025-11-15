@@ -13,6 +13,19 @@ let listenerController = new AbortController();
 // Auto-scale padding factor (0.75 = 25% padding on all sides)
 const AUTOSCALE_PADDING = 0.75;
 
+// Performance optimization: trig cache
+let trigCache = { sin: {}, cos: {} };
+function cachedSin(x) {
+  const key = x.toFixed(4);
+  if (!(key in trigCache.sin)) trigCache.sin[key] = Math.sin(x);
+  return trigCache.sin[key];
+}
+function cachedCos(x) {
+  const key = x.toFixed(4);
+  if (!(key in trigCache.cos)) trigCache.cos[key] = Math.cos(x);
+  return trigCache.cos[key];
+}
+
 function randomizeParameters() {
   const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse", "butterfly", "astroid", "bicorn", "freeth's nephroid", "cardioid"];
   const primaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
@@ -29,13 +42,13 @@ function randomizeParameters() {
     outer: Math.floor(Math.random() * 280) + 80,
     inner: Math.floor(Math.random() * 200) + 20,
     center: Math.floor(Math.random() * 200) + 20,
-    points: Math.floor(Math.random() * 48) + 4,
+    points: Math.floor(Math.random() * 32) + 4,
     layers: Math.floor(Math.random() * 6) + 1,
     offset: ["radius", "rotation", "phase"][Math.floor(Math.random() * 3)],
     offsetAmount: Math.random() * 0.5 + 0.02,
     reverse: Math.random() > 0.5,
     speed: Math.random() * 0.035 + 0.005,
-    trail: Math.floor(Math.random() * 300) + 30,
+    trail: Math.floor(Math.random() * 200) + 30,
     lineWeight: Math.random() * 4 + 0.5,
     lineThinning: Math.random() * 0.9 + 0.1,
     hue: Math.floor(Math.random() * 360),
@@ -52,6 +65,7 @@ function randomizeParameters() {
 
   nextTheme.scale = params.scale;
   
+  resetSpirographs();
   fadeState = "fading-out";
 }
 
@@ -177,15 +191,22 @@ function resetSpirographs() {
 function clearSpirographs() {
   spirographs.forEach(layer => {
     if (Array.isArray(layer)) {
-      layer.forEach(points => {
-        if (Array.isArray(points)) {
-          points.length = 0;
+      layer.forEach(buffer => {
+        if (buffer && buffer.points) {
+          buffer.points = [];
+          buffer.head = 0;
+          buffer.count = 0;
         }
       });
       layer.length = 0;
     }
   });
   spirographs.length = 0;
+  
+  // Clear trig cache periodically to prevent memory bloat
+  if (Object.keys(trigCache.sin).length > 1000) {
+    trigCache = { sin: {}, cos: {} };
+  }
 }
 
 function draw() {
@@ -194,56 +215,37 @@ function draw() {
     background(290, 80, 10, fadeAlpha);
     if (fadeAlpha === 255) {
       clearSpirographs();
+      theta = 0;
       const choice = nextTheme;
-      themeTransition = {
-        from: { ...params },
-        to: {
-          curveType: choice.curveType || "hypotrochoid",
-          dualCurveMode: !!choice.dual,
-          secondaryCurve: choice.secondary || "hypotrochoid",
-          dualModeType: choice.dualMode || "blend",
-          outerRadius: choice.outer ?? 180,
-          innerRadius: choice.inner ?? 80,
-          centerSize: choice.center ?? 60,
-          numPoints: choice.points ?? 12,
-          scale: choice.scale ?? 1.0,
-          numLayers: choice.layers ?? 2,
-          layerOffsetMode: choice.offset || "radius",
-          layerOffsetAmount: choice.offsetAmount ?? 0.06,
-          reverseLayers: !!choice.reverse,
-          animSpeed: choice.speed ?? 0.02,
-          trailLength: choice.trail ?? 120,
-          lineWeight: choice.lineWeight ?? 1.6,
-          lineThinning: choice.lineThinning ?? 0.7,
-          baseHue: choice.hue ?? 260,
-          colorSpread: choice.spread ?? 120
-        },
-        start: millis(),
-        duration: 250
-      };
+      
+      // Apply new params immediately, no transition
+      params.curveType = choice.curveType || "hypotrochoid";
+      params.dualCurveMode = !!choice.dual;
+      params.secondaryCurve = choice.secondary || "hypotrochoid";
+      params.dualModeType = choice.dualMode || "blend";
+      params.outerRadius = choice.outer ?? 180;
+      params.innerRadius = choice.inner ?? 80;
+      params.centerSize = choice.center ?? 60;
+      params.numPoints = choice.points ?? 12;
+      params.scale = choice.scale ?? 1.0;
+      params.numLayers = choice.layers ?? 2;
+      params.layerOffsetMode = choice.offset || "radius";
+      params.layerOffsetAmount = choice.offsetAmount ?? 0.06;
+      params.reverseLayers = !!choice.reverse;
+      params.animSpeed = choice.speed ?? 0.02;
+      params.trailLength = choice.trail ?? 120;
+      params.lineWeight = choice.lineWeight ?? 1.6;
+      params.lineThinning = choice.lineThinning ?? 0.7;
+      params.baseHue = choice.hue ?? 260;
+      params.colorSpread = choice.spread ?? 120;
+      
+      updateUIFromParams();
       fadeState = "fading-in";
     }
     return;
   }
 
   if (!params || Object.keys(params).length === 0) return;
-
-  if (themeTransition) {
-    const t = constrain((millis() - themeTransition.start) / themeTransition.duration, 0, 1);
-    for (let key in themeTransition.to) {
-      const fromVal = themeTransition.from[key];
-      const toVal = themeTransition.to[key];
-      if (typeof toVal === "number") {
-        params[key] = lerp(fromVal, toVal, t);
-      } else {
-        params[key] = t < 0.5 ? fromVal : toVal;
-      }
-    }
-    if (t >= 1) {
-      themeTransition = null;
-      updateUIFromParams();
-    }
-  }
 
   fill(290, 80, 10, constrain(100 - params.trailLength / 20, 2, 95));
   noStroke();
@@ -276,13 +278,9 @@ function draw() {
   textSize(36);
   textAlign(LEFT, BOTTOM);
   
-  drawingContext.shadowBlur = 15;
-  drawingContext.shadowColor = 'rgba(255, 108, 255, 0.6)';
-  
+  // Removed expensive shadow rendering for performance
   fill(255, 64);
   text(currentThemeName, 20, height - 20);
-  
-  drawingContext.shadowBlur = 0;
 }
 
 function drawCurve(index, layer) {
@@ -291,8 +289,10 @@ function drawCurve(index, layer) {
   let centerSize = params.centerSize;
   let currentTheta = theta;
 
-  innerRadius += 20 * sin(frameCount * 0.002 + layer * 0.4);
-  centerSize += 15 * cos(frameCount * 0.0015 + layer * 0.6);
+  // Cache these calculations
+  const frameTimeKey = (frameCount * 0.002).toFixed(4);
+  innerRadius += 20 * cachedSin(parseFloat(frameTimeKey) + layer * 0.4);
+  centerSize += 15 * cachedCos(frameCount * 0.0015 + layer * 0.6);
 
   if (params.layerOffsetMode === "radius") outerRadius *= 1 + layer * params.layerOffsetAmount;
   else if (params.layerOffsetMode === "rotation") currentTheta += layer * params.layerOffsetAmount;
@@ -306,7 +306,7 @@ function drawCurve(index, layer) {
   if (params.dualCurveMode) {
     const c2 = computeCurve(params.secondaryCurve, currentTheta, outerRadius * 0.8, innerRadius * 0.8, centerSize * 0.8);
     if (params.dualModeType === "blend") {
-      const t = sin(frameCount * 0.002) * 0.5 + 0.5;
+      const t = cachedSin(frameCount * 0.002) * 0.5 + 0.5;
       x = lerp(c1.x, c2.x, t);
       y = lerp(c1.y, c2.y, t);
     } else if (params.dualModeType === "combine") {
@@ -319,23 +319,66 @@ function drawCurve(index, layer) {
   }
 
   if (!spirographs[index]) spirographs[index] = [];
-  if (!spirographs[index][layer]) spirographs[index][layer] = [];
-  const arr = spirographs[index][layer];
-  arr.push({ x, y });
-  while (arr.length > params.trailLength) arr.shift();
+  if (!spirographs[index][layer]) {
+    spirographs[index][layer] = {
+      points: new Array(params.trailLength),
+      head: 0,
+      count: 0,
+      maxLength: params.trailLength
+    };
+  }
+  
+  const buffer = spirographs[index][layer];
+  
+  // Handle trail length changes - resize buffer if needed
+  if (buffer.maxLength !== params.trailLength) {
+    const oldPoints = [];
+    let idx = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
+    for (let j = 0; j < buffer.count; j++) {
+      if (buffer.points[idx]) {
+        oldPoints.push(buffer.points[idx]);
+      }
+      idx = (idx + 1) % buffer.maxLength;
+    }
+    
+    buffer.points = new Array(params.trailLength);
+    buffer.head = 0;
+    buffer.count = 0;
+    buffer.maxLength = params.trailLength;
+    
+    // Re-add old points up to new trail length
+    for (let j = 0; j < Math.min(oldPoints.length, params.trailLength); j++) {
+      buffer.points[buffer.head] = oldPoints[j];
+      buffer.head = (buffer.head + 1) % params.trailLength;
+      buffer.count++;
+    }
+  }
+  
+  buffer.points[buffer.head] = { x, y };
+  buffer.head = (buffer.head + 1) % params.trailLength;
+  if (buffer.count < params.trailLength) buffer.count++;
 
-  if (arr.length > 1) {
+  if (buffer.count > 1) {
     let hue = (params.baseHue + (index * params.colorSpread / params.numPoints) + layer * 40) % 360;
-    for (let j = 1; j < arr.length; j++) {
-      const prev = arr[j - 1], curr = arr[j];
-      const factor = j / arr.length;
-      stroke(hue, 70, 95, 20 + 65 * factor);
-      strokeWeight(max(0.05, params.lineWeight * (1 - params.lineThinning * (1 - factor))));
-      line(prev.x, prev.y, curr.x, curr.y);
+    
+    // Draw individual line segments for varying stroke weight
+    let idx = (buffer.head - buffer.count + params.trailLength) % params.trailLength;
+    for (let j = 1; j < buffer.count; j++) {
+      const prevIdx = (idx - 1 + params.trailLength) % params.trailLength;
+      const prev = buffer.points[prevIdx];
+      const curr = buffer.points[idx];
+      
+      if (prev && curr) {
+        const factor = j / buffer.count;
+        stroke(hue, 70, 95, 20 + 65 * factor);
+        strokeWeight(max(0.05, params.lineWeight * (1 - params.lineThinning * (1 - factor))));
+        line(prev.x, prev.y, curr.x, curr.y);
+      }
+      
+      idx = (idx + 1) % params.trailLength;
     }
   }
 }
-
 function computeCurve(type, t, outer, inner, center) {
   let x = 0, y = 0;
   if (type === "hypotrochoid") {
@@ -621,7 +664,7 @@ function autoAdjustScale() {
 function loadCustomThemes() {
   try {
     const customThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
-    window.themes = [...window.themes, ...customThemes];
+  window.themes = [...window.themes, ...customThemes];
   } catch (err) {
     console.warn("Failed to load custom themes:", err);
   }
@@ -667,6 +710,7 @@ function applyTheme(themeName) {
   if (theme) {
     nextTheme = theme;
     currentThemeName = theme.name;
+    resetSpirographs();
     fadeState = "fading-out";
   }
 }
@@ -728,6 +772,7 @@ function shuffleTheme() {
   if (fadeState !== "none") return;
   nextTheme = window.themes[Math.floor(Math.random() * window.themes.length)];
   currentThemeName = nextTheme.name;
+  resetSpirographs();
   fadeState = "fading-out";
 }
 
