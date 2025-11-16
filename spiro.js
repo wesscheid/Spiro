@@ -203,10 +203,8 @@ function clearSpirographs() {
   });
   spirographs.length = 0;
   
-  // Clear trig cache periodically to prevent memory bloat
-  if (Object.keys(trigCache.sin).length > 1000) {
-    trigCache = { sin: {}, cos: {} };
-  }
+  // Clear trig cache to prevent memory bloat
+  trigCache = { sin: {}, cos: {} };
 }
 
 function draw() {
@@ -332,26 +330,18 @@ function drawCurve(index, layer) {
   
   // Handle trail length changes - resize buffer if needed
   if (buffer.maxLength !== params.trailLength) {
-    const oldPoints = [];
-    let idx = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
-    for (let j = 0; j < buffer.count; j++) {
-      if (buffer.points[idx]) {
-        oldPoints.push(buffer.points[idx]);
-      }
-      idx = (idx + 1) % buffer.maxLength;
+    const newPoints = new Array(params.trailLength);
+    const toCopy = Math.min(buffer.count, params.trailLength);
+    const start = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
+    
+    for (let i = 0; i < toCopy; i++) {
+      newPoints[i] = buffer.points[(start + i) % buffer.maxLength];
     }
     
-    buffer.points = new Array(params.trailLength);
-    buffer.head = 0;
-    buffer.count = 0;
+    buffer.points = newPoints;
+    buffer.head = toCopy % params.trailLength;
+    buffer.count = toCopy;
     buffer.maxLength = params.trailLength;
-    
-    // Re-add old points up to new trail length
-    for (let j = 0; j < Math.min(oldPoints.length, params.trailLength); j++) {
-      buffer.points[buffer.head] = oldPoints[j];
-      buffer.head = (buffer.head + 1) % params.trailLength;
-      buffer.count++;
-    }
   }
   
   buffer.points[buffer.head] = { x, y };
@@ -361,22 +351,21 @@ function drawCurve(index, layer) {
   if (buffer.count > 1) {
     let hue = (params.baseHue + (index * params.colorSpread / params.numPoints) + layer * 40) % 360;
     
-    // Draw individual line segments for varying stroke weight
-    let idx = (buffer.head - buffer.count + params.trailLength) % params.trailLength;
-    for (let j = 1; j < buffer.count; j++) {
-      const prevIdx = (idx - 1 + params.trailLength) % params.trailLength;
-      const prev = buffer.points[prevIdx];
-      const curr = buffer.points[idx];
-      
-      if (prev && curr) {
-        const factor = j / buffer.count;
-        stroke(hue, 70, 95, 20 + 65 * factor);
-        strokeWeight(max(0.05, params.lineWeight * (1 - params.lineThinning * (1 - factor))));
-        line(prev.x, prev.y, curr.x, curr.y);
+    // Use beginShape/endShape for much faster line drawing
+    stroke(hue, 70, 95, 85);
+    strokeWeight(params.lineWeight);
+    noFill();
+    
+    beginShape();
+    let idx = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
+    for (let j = 0; j < buffer.count; j++) {
+      const point = buffer.points[idx];
+      if (point) {
+        vertex(point.x, point.y);
       }
-      
-      idx = (idx + 1) % params.trailLength;
+      idx = (idx + 1) % buffer.maxLength;
     }
+    endShape();
   }
 }
 function computeCurve(type, t, outer, inner, center) {
