@@ -30,9 +30,9 @@ function randomizeParameters() {
   const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse", "butterfly", "astroid", "bicorn", "freeth's nephroid", "cardioid"];
   const primaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
   const secondaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
-  
+
   currentThemeName = "Random";
-  
+
   nextTheme = {
     name: "Random",
     curveType: primaryCurve,
@@ -64,7 +64,7 @@ function randomizeParameters() {
   };
 
   nextTheme.scale = params.scale;
-  
+
   resetSpirographs();
   fadeState = "fading-out";
 }
@@ -202,7 +202,7 @@ function clearSpirographs() {
     }
   });
   spirographs.length = 0;
-  
+
   // Clear trig cache to prevent memory bloat
   trigCache = { sin: {}, cos: {} };
 }
@@ -215,7 +215,7 @@ function draw() {
       clearSpirographs();
       theta = 0;
       const choice = nextTheme;
-      
+
       // Apply new params immediately, no transition
       params.curveType = choice.curveType || "hypotrochoid";
       params.dualCurveMode = !!choice.dual;
@@ -236,7 +236,7 @@ function draw() {
       params.lineThinning = choice.lineThinning ?? 0.7;
       params.baseHue = choice.hue ?? 260;
       params.colorSpread = choice.spread ?? 120;
-      
+
       updateUIFromParams();
       fadeState = "fading-in";
     }
@@ -275,7 +275,7 @@ function draw() {
   textFont("Splash");
   textSize(36);
   textAlign(LEFT, BOTTOM);
-  
+
   // Removed expensive shadow rendering for performance
   fill(255, 64);
   text(currentThemeName, 20, height - 20);
@@ -325,37 +325,37 @@ function drawCurve(index, layer) {
       maxLength: params.trailLength
     };
   }
-  
+
   const buffer = spirographs[index][layer];
-  
+
   // Handle trail length changes - resize buffer if needed
   if (buffer.maxLength !== params.trailLength) {
     const newPoints = new Array(params.trailLength);
     const toCopy = Math.min(buffer.count, params.trailLength);
     const start = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
-    
+
     for (let i = 0; i < toCopy; i++) {
       newPoints[i] = buffer.points[(start + i) % buffer.maxLength];
     }
-    
+
     buffer.points = newPoints;
     buffer.head = toCopy % params.trailLength;
     buffer.count = toCopy;
     buffer.maxLength = params.trailLength;
   }
-  
+
   buffer.points[buffer.head] = { x, y };
   buffer.head = (buffer.head + 1) % params.trailLength;
   if (buffer.count < params.trailLength) buffer.count++;
 
   if (buffer.count > 1) {
     let hue = (params.baseHue + (index * params.colorSpread / params.numPoints) + layer * 40) % 360;
-    
+
     // Use beginShape/endShape for much faster line drawing
     stroke(hue, 70, 95, 85);
     strokeWeight(params.lineWeight);
     noFill();
-    
+
     beginShape();
     let idx = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
     for (let j = 0; j < buffer.count; j++) {
@@ -499,11 +499,11 @@ function resetAutoPlayTimer() {
   if (params.autoPlay) {
     autoPlayCountdown = params.autoPlayInterval;
     updateCountdown();
-    
+
     autoPlayTimer = setInterval(() => {
       autoPlayCountdown--;
       updateCountdown();
-      
+
       if (autoPlayCountdown <= 0) {
         randomizeParameters();
         autoPlayCountdown = params.autoPlayInterval;
@@ -650,12 +650,43 @@ function autoAdjustScale() {
   }
 }
 
-function loadCustomThemes() {
+async function loadCustomThemes() {
+  // Wait for Firestore to be ready
+  while (!window.firestoreReady) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
   try {
-    const customThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
-  window.themes = [...window.themes, ...customThemes];
+    // Import Firestore functions
+    const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
+    
+    // Get all community themes from Firebase
+    const querySnapshot = await getDocs(collection(window.firestore, "themes"));
+    const communityThemes = [];
+    
+    querySnapshot.forEach((doc) => {
+      const theme = doc.data();
+      theme.id = doc.id; // Store the Firebase document ID
+      theme.isCommunity = true; // Mark as community theme
+      communityThemes.push(theme);
+    });
+    
+    console.log(`Loaded ${communityThemes.length} community themes from Firebase`);
+    
+    // Also load user's local themes
+    const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+    
+    // Combine built-in, local, and community themes
+    window.themes = [...window.themes, ...localThemes, ...communityThemes];
   } catch (err) {
-    console.warn("Failed to load custom themes:", err);
+    console.warn("Failed to load community themes:", err);
+    // Fallback to local themes only
+    try {
+      const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+      window.themes = [...window.themes, ...localThemes];
+    } catch (e) {
+      console.warn("Failed to load local themes:", e);
+    }
   }
 }
 
@@ -673,7 +704,7 @@ function populateThemes() {
   if (themeSelect) {
     const currentVal = themeSelect.value;
     themeSelect.innerHTML = "";
-    
+
     const customOption = document.createElement("option");
     customOption.value = "Custom";
     customOption.textContent = "Custom";
@@ -704,54 +735,96 @@ function applyTheme(themeName) {
   }
 }
 
-function savePreset() {
+async function savePreset() {
   const name = prompt("Enter a name for your preset:");
-  if (name) {
-    const newPreset = {
-      name: name,
-      curveType: params.curveType,
-      dual: params.dualCurveMode,
-      secondary: params.secondaryCurve,
-      dualMode: params.dualModeType,
-      outer: params.outerRadius,
-      inner: params.innerRadius,
-      center: params.centerSize,
-      points: params.numPoints,
-      scale: params.scale,
-      layers: params.numLayers,
-      offset: params.layerOffsetMode,
-      offsetAmount: params.layerOffsetAmount,
-      reverse: params.reverseLayers,
-      speed: params.animSpeed,
-      trail: params.trailLength,
-      lineWeight: params.lineWeight,
-      lineThinning: params.lineThinning,
-      hue: params.baseHue,
-      spread: params.colorSpread,
-      m: params.m,
-      n1: params.n1,
-      n2: params.n2,
-      n3: params.n3,
-      f1: params.f1,
-      f2: params.f2,
-      d1: params.d1,
-      d2: params.d2,
-      isBuiltIn: false
-    };
-
-    window.themes.push(newPreset);
-    saveCustomThemes();
-    populateThemes();
-    
-    const themeSelect = document.getElementById("themeSelect");
-    if (themeSelect) {
-      themeSelect.value = name;
+  if (!name) return;
+  
+  const saveType = confirm(
+    "OK = Save for everyone to see (Community)\n" +
+    "Cancel = Save locally only (Just for you)"
+  );
+  
+  const newPreset = {
+    name: name,
+    curveType: params.curveType,
+    dual: params.dualCurveMode,
+    secondary: params.secondaryCurve,
+    dualMode: params.dualModeType,
+    outer: params.outerRadius,
+    inner: params.innerRadius,
+    center: params.centerSize,
+    points: params.numPoints,
+    scale: params.scale,
+    layers: params.numLayers,
+    offset: params.layerOffsetMode,
+    offsetAmount: params.layerOffsetAmount,
+    reverse: params.reverseLayers,
+    speed: params.animSpeed,
+    trail: params.trailLength,
+    lineWeight: params.lineWeight,
+    lineThinning: params.lineThinning,
+    hue: params.baseHue,
+    spread: params.colorSpread,
+    m: params.m,
+    n1: params.n1,
+    n2: params.n2,
+    n3: params.n3,
+    f1: params.f1,
+    f2: params.f2,
+    d1: params.d1,
+    d2: params.d2,
+    createdAt: new Date().toISOString()
+  };
+  
+  if (saveType) {
+    // Save to Firebase (community)
+    try {
+      const { collection, addDoc } = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
+      
+      const docRef = await addDoc(collection(window.firestore, "themes"), newPreset);
+      newPreset.id = docRef.id;
+      newPreset.isCommunity = true;
+      
+      window.themes.push(newPreset);
+      populateThemes();
+      
+      const themeSelect = document.getElementById("themeSelect");
+      if (themeSelect) {
+        themeSelect.value = name;
+      }
+      
+      alert(`Preset '${name}' saved and shared with the community! 🎉`);
+      console.log("Community preset saved:", newPreset);
+    } catch (err) {
+      console.error("Failed to save to Firebase:", err);
+      alert("Failed to save community preset. Try saving locally instead.");
     }
-
-    console.log("New preset saved:", newPreset);
-    alert(`Preset '${name}' saved!`);
+  } else {
+    // Save locally only
+    newPreset.isBuiltIn = false;
+    
+    try {
+      const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+      localThemes.push(newPreset);
+      localStorage.setItem("spiro_custom_themes", JSON.stringify(localThemes));
+      
+      window.themes.push(newPreset);
+      populateThemes();
+      
+      const themeSelect = document.getElementById("themeSelect");
+      if (themeSelect) {
+        themeSelect.value = name;
+      }
+      
+      alert(`Preset '${name}' saved locally!`);
+      console.log("Local preset saved:", newPreset);
+    } catch (err) {
+      console.error("Failed to save locally:", err);
+      alert("Failed to save preset.");
+    }
   }
 }
+
 
 let nextTheme = null;
 let currentThemeName = "";
@@ -804,3 +877,4 @@ document.addEventListener("fullscreenchange", () => {
   resizeCanvas(w, h);
   clearSpirographs();
 });
+
