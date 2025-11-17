@@ -304,5 +304,26 @@
       }
     });
   </script>
+  <!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB63VUe5mBhFmzjoNxr2ZkT8goBlLGH9zc",
+    authDomain: "spiro-app-28ae0.firebaseapp.com",
+    projectId: "spiro-app-28ae0",
+    storageBucket: "spiro-app-28ae0.firebasestorage.app",
+    messagingSenderId: "196456415038",
+    appId: "1:196456415038:web:422ea439b98933d739b66f"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  
+  // Make db available globally
+  window.firestore = db;
+  window.firestoreReady = true;
+</script>
 </body>
 </html>
