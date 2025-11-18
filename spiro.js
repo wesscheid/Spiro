@@ -825,7 +825,6 @@ async function savePreset() {
   }
 }
 
-
 let nextTheme = null;
 let currentThemeName = "";
 
