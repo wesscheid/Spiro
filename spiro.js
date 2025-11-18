@@ -88,9 +88,17 @@ function setup() {
 
   setupEventListeners();
 
+  // Initialize themes array if themes.js hasn't loaded yet
+  if (!window.themes) {
+    window.themes = [];
+  }
+  
   window.themes.forEach(t => t.isBuiltIn = true);
-  loadCustomThemes();
-  populateThemes();
+  
+  // Load custom themes asynchronously
+  loadCustomThemes().then(() => {
+    populateThemes();
+  });
 
   updateShapeParams();
   updateStyleParams();
@@ -368,6 +376,7 @@ function drawCurve(index, layer) {
     endShape();
   }
 }
+
 function computeCurve(type, t, outer, inner, center) {
   let x = 0, y = 0;
   if (type === "hypotrochoid") {
@@ -639,7 +648,6 @@ function autoAdjustScale() {
 
   if (maxRadius > 0) {
     const maxAllowedRadius = min(width, height) / 2;
-    // Apply padding factor (0.85 = 15% padding on all sides for breathing room)
     const newScale = (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING;
     params.scale = newScale;
     document.getElementById("scale").value = newScale;
@@ -651,9 +659,22 @@ function autoAdjustScale() {
 }
 
 async function loadCustomThemes() {
-  // Wait for Firestore to be ready
-  while (!window.firestoreReady) {
+  // Wait for Firestore to be ready (with timeout)
+  let attempts = 0;
+  while (!window.firestoreReady && attempts < 50) {
     await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+  
+  if (!window.firestoreReady) {
+    console.warn("Firestore not ready, loading local themes only");
+    try {
+      const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+      window.themes = [...window.themes, ...localThemes];
+    } catch (e) {
+      console.warn("Failed to load local themes:", e);
+    }
+    return;
   }
   
   try {
@@ -666,8 +687,8 @@ async function loadCustomThemes() {
     
     querySnapshot.forEach((doc) => {
       const theme = doc.data();
-      theme.id = doc.id; // Store the Firebase document ID
-      theme.isCommunity = true; // Mark as community theme
+      theme.id = doc.id;
+      theme.isCommunity = true;
       communityThemes.push(theme);
     });
     
@@ -692,7 +713,7 @@ async function loadCustomThemes() {
 
 function saveCustomThemes() {
   try {
-    const customThemes = window.themes.filter(theme => !theme.isBuiltIn);
+    const customThemes = window.themes.filter(theme => !theme.isBuiltIn && !theme.isCommunity);
     localStorage.setItem("spiro_custom_themes", JSON.stringify(customThemes));
   } catch (err) {
     console.warn("Failed to save custom themes:", err);
@@ -713,7 +734,7 @@ function populateThemes() {
     window.themes.forEach(theme => {
       const option = document.createElement("option");
       option.value = theme.name;
-      option.textContent = theme.name;
+      option.textContent = theme.name + (theme.isCommunity ? " 🌐" : "");
       themeSelect.appendChild(option);
     });
 
@@ -876,4 +897,3 @@ document.addEventListener("fullscreenchange", () => {
   resizeCanvas(w, h);
   clearSpirographs();
 });
-
