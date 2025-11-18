@@ -280,11 +280,6 @@ window.themes = [
     "reverse": false,
     "dual": false
   },
-
-  /* ================================
-     NEW THEMES ADDED BELOW
-  ================================ */
-
   {
     "name": "Aurora Drift",
     "curveType": "hypotrochoid",
