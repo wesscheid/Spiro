@@ -279,7 +279,7 @@ window.themes = [
     "offset": "radius",
     "reverse": false,
     "dual": false
-  }
+  },
   {
   "name": "Aurora Drift",
   "curveType": "hypotrochoid",
