@@ -111,6 +111,7 @@ function setupEventListeners() {
 
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
+  document.getElementById("randomizeParams")?.addEventListener("click", randomizeParameters, options);
   document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
   document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
     autoAdjustScale();
@@ -862,38 +863,24 @@ function toggleFullscreenCanvas() {
   const container = document.getElementById("canvas-container");
   const controls = document.getElementById("controls");
   const button = document.getElementById("fullscreenToggle");
+  const body = document.body;
 
-  if (!document.fullscreenElement) {
-    container?.requestFullscreen().then(() => {
-      fullscreenMode = true;
-      if (controls) controls.style.display = "none";
-      if (button) button.innerHTML = "&#x2715;";
-      const { w, h } = getCanvasSize();
-      resizeCanvas(w, h);
-      clearSpirographs();
-    });
+  fullscreenMode = !fullscreenMode;
+
+  if (fullscreenMode) {
+    container.classList.add("force-fullscreen");
+    body.classList.add("force-fullscreen-active");
+    if (controls) controls.style.display = "none";
+    if (button) button.innerHTML = "&#x2715;";
   } else {
-    document.exitFullscreen().then(() => {
-      fullscreenMode = false;
-      if (controls) controls.style.display = "block";
-      if (button) button.innerHTML = "&#x26F6;";
-      const { w, h } = getCanvasSize();
-      resizeCanvas(w, h);
-      clearSpirographs();
-    });
+    container.classList.remove("force-fullscreen");
+    body.classList.remove("force-fullscreen-active");
+    if (controls) controls.style.display = "block";
+    if (button) button.innerHTML = "&#x26F6;";
   }
-}
 
-document.addEventListener("fullscreenchange", () => {
-  const controls = document.getElementById("controls");
-  const button = document.getElementById("fullscreenToggle");
-  fullscreenMode = !!document.fullscreenElement;
-  if (controls) controls.style.display = fullscreenMode ? "none" : "block";
-  if (button) {
-    button.style.display = "block";
-    button.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
-  }
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  clearSpirographs();
-});
+  // Use a short timeout to allow the browser to apply CSS changes
+  setTimeout(() => {
+    windowResized();
+  }, 50);
+}
