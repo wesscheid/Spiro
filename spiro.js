@@ -106,6 +106,11 @@ function setup() {
   updateParameterVisibility(params.curveType, params.secondaryCurve);
 }
 
+function saveImage() {
+  const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+  saveCanvas(`spirograph_${timestamp}`, 'png');
+}
+
 function setupEventListeners() {
   const options = { signal: listenerController.signal };
 
@@ -113,6 +118,7 @@ function setupEventListeners() {
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
   document.getElementById("randomizeParams")?.addEventListener("click", randomizeParameters, options);
   document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
+  document.getElementById("saveImageBtn")?.addEventListener("click", saveImage, options);
   document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
     autoAdjustScale();
     resetSpirographs();

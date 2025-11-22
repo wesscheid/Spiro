@@ -223,7 +223,8 @@ canvas {
   }
 
   #shuffleTheme,
-  #savePreset {
+  #savePreset,
+  #saveImageBtn {
     margin-top: 8px;
   }
 
