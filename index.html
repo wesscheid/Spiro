@@ -6,6 +6,7 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.2/p5.min.js"></script>
+  <script src="https://unpkg.com/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,6 +33,7 @@
           <button id="randomizeParams">Randomize</button>
           <button id="savePreset">Save Preset</button>
           <button id="saveImageBtn">Save Image</button>
+          <button id="captureVideoBtn">Capture Video</button>
         </div>
         <div class="control-group">
           <button id="autoScaleBtn">Auto Scale</button>
@@ -196,7 +198,7 @@
       <div class="section-content">
         <div class="control-group">
           <label for="animSpeed">Anim Speed <span id="animSpeed-value" class="value-display"></span></label>
-          <input id="animSpeed" type="range" min="0" max="0.04" step="0.001" value="0.02">
+          <input id="animSpeed" type="range" min="0" max="0.10" step="0.001" value="0.04">
         </div>
 
         <div class="control-group">

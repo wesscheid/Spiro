@@ -9,6 +9,8 @@ let fadeAlpha = 0;
 let autoPlayTimer = null;
 let autoPlayCountdown = 0;
 let listenerController = new AbortController();
+let capturer = null;
+let isRecording = false;
 
 // Auto-scale padding factor (0.75 = 25% padding on all sides)
 const AUTOSCALE_PADDING = 0.75;
@@ -111,6 +113,31 @@ function saveImage() {
   saveCanvas(`spirograph_${timestamp}`, 'png');
 }
 
+function toggleRecording() {
+  if (!isRecording) {
+    // Start recording
+    capturer = new CCapture({
+      format: 'webm',
+      framerate: 60,
+      verbose: true
+    });
+    capturer.start();
+    isRecording = true;
+    console.log("Recording started");
+    // Stop recording after 5 seconds
+    setTimeout(() => {
+      toggleRecording();
+    }, 5000);
+  } else {
+    // Stop and save
+    capturer.stop();
+    capturer.save();
+    isRecording = false;
+    capturer = null;
+    console.log("Recording stopped and saved");
+  }
+}
+
 function setupEventListeners() {
   const options = { signal: listenerController.signal };
 
@@ -119,6 +146,7 @@ function setupEventListeners() {
   document.getElementById("randomizeParams")?.addEventListener("click", randomizeParameters, options);
   document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
   document.getElementById("saveImageBtn")?.addEventListener("click", saveImage, options);
+  document.getElementById("captureVideoBtn")?.addEventListener("click", toggleRecording, options);
   document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
     autoAdjustScale();
     resetSpirographs();
@@ -294,6 +322,10 @@ function draw() {
   // Removed expensive shadow rendering for performance
   fill(255, 64);
   text(currentThemeName, 20, height - 20);
+
+  if (isRecording && capturer) {
+    capturer.capture(canvasEl);
+  }
 }
 
 function drawCurve(index, layer) {
