@@ -114,6 +114,8 @@ function saveImage() {
 }
 
 function toggleRecording() {
+  const captureButton = document.getElementById('captureVideoBtn');
+  const videoLength = document.getElementById('videoLength').value;
   if (!isRecording) {
     // Start recording
     capturer = new CCapture({
@@ -123,17 +125,21 @@ function toggleRecording() {
     });
     capturer.start();
     isRecording = true;
+    captureButton.innerText = 'Recording...';
+    captureButton.disabled = true;
     console.log("Recording started");
-    // Stop recording after 5 seconds
+    // Stop recording after selected duration
     setTimeout(() => {
       toggleRecording();
-    }, 5000);
+    }, videoLength * 1000);
   } else {
     // Stop and save
     capturer.stop();
     capturer.save();
     isRecording = false;
     capturer = null;
+    captureButton.innerText = 'Capture Video';
+    captureButton.disabled = false;
     console.log("Recording stopped and saved");
   }
 }
@@ -322,6 +328,13 @@ function draw() {
   // Removed expensive shadow rendering for performance
   fill(255, 64);
   text(currentThemeName, 20, height - 20);
+
+  if (isRecording) {
+    fill(255, 0, 0);
+    textSize(24);
+    textAlign(LEFT, TOP);
+    text("REC", 20, 20);
+  }
 
   if (isRecording && capturer) {
     capturer.capture(canvasEl);
