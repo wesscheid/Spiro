@@ -14,6 +14,7 @@ Designed for creative exploration and smooth animation — built with **p5.js**,
 - **Multi-layer rendering** with per-layer offsets and optional reverse rotation.
 - **Dynamic line thinning** and trail fading for smooth motion.
 - **Preset themes** for quick exploration (`themes.js`).
+- **Video Capture**: Record your animations as a `webm` video file. Choose from 5, 10, or 15-second recording lengths.
 - Fully modular structure: `style.css`, `spiro.js`, and `themes.js` are separated for easy editing.
 
 ---
@@ -47,6 +48,7 @@ You can run it directly in any modern browser.
 
 - Try small **Animation Speed** values (0.005–0.03) for smoother, hypnotic motion.  
 - Use the **Dual Curve Mode** to mix harmonograph and spiro formulas.  
+- **Capture Your Creations**: Use the "Capture Video" button to record your animations. A "REC" indicator will show on the canvas while recording.
 - Toggle **Reverse Alternate Layers** for rotating interference effects.  
 - Curate your favorite looks into `themes.js` and reload with the **Shuffle Theme** button.
 
