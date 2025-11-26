@@ -14,7 +14,7 @@ window.themes = [
     "trail": 120,
     "lineWeight": 1.6,
     "lineThinning": 0.7,
-    "hue": 260,
+    "hue": 35,
     "spread": 120
   },
   {
