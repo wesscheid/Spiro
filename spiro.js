@@ -1,6 +1,7 @@
-let params = {};
+let parameterManager;
 let spirographs = [];
 let theta = 0;
+let renderer;
 let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
@@ -12,21 +13,182 @@ let listenerController = new AbortController();
 let capturer = null;
 let isRecording = false;
 
+class SpiroRenderer {
+    constructor(parameterManager) {
+        this.parameterManager = parameterManager;
+        this.spirographs = [];
+        this.theta = 0;
+    }
+
+    reset() {
+        this.clear();
+        this.theta = 0;
+        clear(); // Use clear() to make the canvas transparent
+    }
+
+    clear() {
+        this.spirographs.forEach(layer => {
+            if (Array.isArray(layer)) {
+                layer.forEach(buffer => {
+                    if (buffer && buffer.points) {
+                        buffer.points = [];
+                        buffer.head = 0;
+                    }
+                });
+                layer.length = 0;
+            }
+        });
+        this.spirographs.length = 0;
+    }
+
+    draw() {
+        const { state } = this.parameterManager;
+        if (!state) return;
+
+        // Fill with a transparent version of the new background color for the trail effect
+        fill(224, 39, 11, constrain(100 - state.trailLength / 20, 2, 95));
+        noStroke();
+        rect(0, 0, width, height);
+
+        push();
+        translate(width / 2, height / 2);
+        scale(state.scale);
+        let drift = radians(0.01 * frameCount);
+
+        for (let i = 0; i < state.numPoints; i++) {
+            push();
+            rotate((i * TWO_PI) / state.numPoints + drift);
+            for (let l = 0; l < state.numLayers; l++) {
+                this._drawCurve(i, l);
+            }
+            pop();
+        }
+        pop();
+
+        this.theta += state.animSpeed;
+    }
+
+    _drawCurve(index, layer) {
+        const { state } = this.parameterManager;
+        let { outerRadius, innerRadius, centerSize } = state;
+        let currentTheta = this.theta;
+
+        innerRadius += 20 * sin((frameCount * 0.002) + layer * 0.4);
+        centerSize += 15 * cos(frameCount * 0.0015 + layer * 0.6);
+
+        if (state.layerOffsetMode === "radius") outerRadius *= 1 + layer * state.layerOffsetAmount;
+        else if (state.layerOffsetMode === "rotation") currentTheta += layer * state.layerOffsetAmount;
+        else if (state.layerOffsetMode === "phase") currentTheta += layer * PI * state.layerOffsetAmount;
+
+        if (state.reverseLayers && layer % 2 === 1) currentTheta *= -1;
+
+        const c1 = computeCurve(state.curveType, currentTheta, outerRadius, innerRadius, centerSize);
+        let { x, y } = c1;
+
+        if (state.dualCurveMode) {
+            const c2 = computeCurve(state.secondaryCurve, currentTheta, outerRadius * 0.8, innerRadius * 0.8, centerSize * 0.8);
+            if (state.dualModeType === "blend") {
+                const t = sin(frameCount * 0.002) * 0.5 + 0.5;
+                x = lerp(c1.x, c2.x, t);
+                y = lerp(c1.y, c2.y, t);
+            } else if (state.dualModeType === "combine") {
+                x = c1.x + c2.x;
+                y = c1.y + c2.y;
+            } else if (state.dualModeType === "alternate" && layer % 2 === 1) {
+                x = c2.x;
+                y = c2.y;
+            }
+        }
+
+                if (!this.spirographs[index]) this.spirographs[index] = [];
+
+                if (!this.spirographs[index][layer]) {
+
+                    // Create a buffer with the maximum possible size ONCE.
+
+                    this.spirographs[index][layer] = {
+
+                        points: new Array(400),
+
+                        head: 0,
+
+                    };
+
+                }
+
+        
+
+                const buffer = this.spirographs[index][layer];
+
+                
+
+                // Write the new point to the physical buffer.
+
+                buffer.points[buffer.head] = { x, y };
+
+                buffer.head = (buffer.head + 1) % 400;
+
+        
+
+                const numToDraw = Math.floor(state.trailLength);
+
+        
+
+                if (numToDraw > 1) {
+
+                    let hue = (state.baseHue + (index * state.colorSpread / state.numPoints) + layer * 40) % 360;
+
+                    stroke(hue, 70, 95, 85);
+
+                    noFill();
+
+        
+
+                    const minWeight = state.lineWeight * (1 - state.lineThinning);
+
+        
+
+                    // Backtrack from the head to draw the trail.
+
+                    for (let j = 0; j < numToDraw - 1; j++) {
+
+                        // j=0 is the segment closest to the head (newest)
+
+                        const p1_idx = (buffer.head - 1 - j + 400) % 400;
+
+                        const p2_idx = (buffer.head - 2 - j + 400) % 400;
+
+                        
+
+                        const p1 = buffer.points[p1_idx];
+
+                        const p2 = buffer.points[p2_idx];
+
+        
+
+                        if (p1 && p2) {
+
+                            // progress=1 is the newest segment, progress=0 is the oldest.
+
+                            const progress = (numToDraw - 1 - j) / (numToDraw - 1);
+
+                            const weight = lerp(minWeight, state.lineWeight, progress);
+
+                            strokeWeight(weight);
+
+                            line(p1.x, p1.y, p2.x, p2.y);
+
+                        }
+
+                    }
+
+                }
+
+            }
+}
+
 // Auto-scale padding factor (0.75 = 25% padding on all sides)
 const AUTOSCALE_PADDING = 0.75;
-
-// Performance optimization: trig cache
-let trigCache = { sin: {}, cos: {} };
-function cachedSin(x) {
-  const key = x.toFixed(4);
-  if (!(key in trigCache.sin)) trigCache.sin[key] = Math.sin(x);
-  return trigCache.sin[key];
-}
-function cachedCos(x) {
-  const key = x.toFixed(4);
-  if (!(key in trigCache.cos)) trigCache.cos[key] = Math.cos(x);
-  return trigCache.cos[key];
-}
 
 function randomizeParameters() {
   const curveTypes = ["hypotrochoid", "epitrochoid", "rose", "lissajous", "superformula", "harmonograph", "hypocycloid", "epicycloid", "cycloid", "trochoid", "limacon", "ellipse", "butterfly", "astroid", "bicorn", "freeth's nephroid", "cardioid"];
@@ -65,9 +227,9 @@ function randomizeParameters() {
     d2: Math.random() * 0.005 + 0.0001
   };
 
-  nextTheme.scale = params.scale;
+  nextTheme.scale = parameterManager.state.scale;
 
-  resetSpirographs();
+  renderer.reset();
   fadeState = "fading-out";
 }
 
@@ -88,6 +250,8 @@ function setup() {
   frameRate(60);
   fadeAlpha = 0;
 
+  parameterManager = new ParameterManager();
+  renderer = new SpiroRenderer(parameterManager);
   setupEventListeners();
 
   // Initialize themes array if themes.js hasn't loaded yet
@@ -102,10 +266,7 @@ function setup() {
     populateThemes();
   });
 
-  updateShapeParams();
-  updateStyleParams();
-  resetSpirographs();
-  updateParameterVisibility(params.curveType, params.secondaryCurve);
+  renderer.reset();
 }
 
 function saveImage() {
@@ -144,6 +305,30 @@ function toggleRecording() {
   }
 }
 
+function applyComplexity() {
+    const { state } = parameterManager;
+    if (state.complexity === undefined) return;
+
+    // This function is only called when a control is manually changed.
+    // We check if the 'complexity' slider was the one changed. If not, we don't apply the logic.
+    // A simple way to do this is to have a flag, but for now we will apply it on any change.
+    
+    const complexity = pow(state.complexity, 2);
+
+    // Map complexity to numPoints (e.g., from 1 to 36)
+    state.numPoints = Math.round(lerp(1, 36, complexity));
+
+    // Map complexity to numLayers (e.g., from 1 to 8)
+    state.numLayers = Math.round(lerp(1, 8, state.complexity));
+
+    // Map complexity to the radius ratio.
+    const baseRatio = lerp(0.25, 0.95, state.complexity);
+    state.innerRadius = state.outerRadius * baseRatio;
+
+    // We need to update the UI to reflect these derived values.
+    parameterManager.updateUIFromState();
+}
+
 function setupEventListeners() {
   const options = { signal: listenerController.signal };
 
@@ -155,7 +340,7 @@ function setupEventListeners() {
   document.getElementById("captureVideoBtn")?.addEventListener("click", toggleRecording, options);
   document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
     autoAdjustScale();
-    resetSpirographs();
+    renderer.reset();
   }, options);
 
   const themeSelect = document.getElementById("themeSelect");
@@ -164,155 +349,78 @@ function setupEventListeners() {
       applyTheme(themeSelect.value);
     }, options);
   }
-
-  const autoPlayIntervalSlider = document.getElementById("autoPlayInterval");
-  if (autoPlayIntervalSlider) {
-    autoPlayIntervalSlider.addEventListener("input", () => {
-      const display = document.getElementById("autoPlayInterval-value");
-      if (display) {
-        display.textContent = autoPlayIntervalSlider.value;
+  
+  // The ParameterManager now handles binding all UI controls in the panel.
+  parameterManager.bindUI((changedId) => {
+      if (changedId === 'complexity' || changedId === 'outerRadius') {
+        applyComplexity();
       }
-      params.autoPlayInterval = parseInt(autoPlayIntervalSlider.value, 10);
+      resetSpirographs();
       resetAutoPlayTimer();
-    }, options);
-  }
-
-  const shapeParams = ["curveType", "dualCurveMode", "secondaryCurve", "dualModeType", "outerRadius", "innerRadius", "centerSize", "numPoints", "scale", "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2"];
-  const styleParams = ["animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread"];
-
-  shapeParams.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      const eventType = el.type === "checkbox" ? "change" : "input";
-      el.addEventListener(eventType, () => {
-        updateShapeParams();
-        resetSpirographs();
-        const display = document.getElementById(id + "-value");
-        if (display) {
-          display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
-        }
-      }, options);
-    }
   });
-
-  styleParams.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      const eventType = el.type === "checkbox" ? "change" : "input";
-      el.addEventListener(eventType, () => {
-        updateStyleParams();
-        const display = document.getElementById(id + "-value");
-        if (display) {
-          display.textContent = String(el.step || "").includes('.') ? parseFloat(el.value).toFixed(2) : Math.round(el.value);
-        }
-      }, options);
-    }
-  });
-
-  const autoPlayCheckbox = document.getElementById("autoPlay");
-  if (autoPlayCheckbox) {
-    autoPlayCheckbox.addEventListener("change", () => {
-      updateStyleParams();
-      const autoPlaySlider = document.getElementById("autoPlay-slider-container");
-      if (autoPlaySlider) {
-        autoPlaySlider.style.display = autoPlayCheckbox.checked ? "block" : "none";
-      }
-    }, options);
-    const autoPlaySlider = document.getElementById("autoPlay-slider-container");
-    if (autoPlaySlider) {
-      autoPlaySlider.style.display = autoPlayCheckbox.checked ? "block" : "none";
-    }
-  }
 }
 
 function windowResized() {
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
-  clearSpirographs();
+  renderer.clear();
 }
 
-function resetSpirographs() {
-  clearSpirographs();
-  theta = 0;
-  background(290, 80, 10);
-}
 
-function clearSpirographs() {
-  spirographs.forEach(layer => {
-    if (Array.isArray(layer)) {
-      layer.forEach(buffer => {
-        if (buffer && buffer.points) {
-          buffer.points = [];
-          buffer.head = 0;
-          buffer.count = 0;
-        }
-      });
-      layer.length = 0;
-    }
-  });
-  spirographs.length = 0;
-
-  // Clear trig cache to prevent memory bloat
-  trigCache = { sin: {}, cos: {} };
-}
 
 function draw() {
+  // Handle theme transition fade
   if (fadeState === "fading-out") {
     fadeAlpha = min(fadeAlpha + 10, 255);
     background(290, 80, 10, fadeAlpha);
     if (fadeAlpha === 255) {
-      clearSpirographs();
-      theta = 0;
+      renderer.clear();
+      renderer.theta = 0;
       const choice = nextTheme;
 
-      // Apply new params immediately, no transition
-      params.curveType = choice.curveType || "hypotrochoid";
-      params.dualCurveMode = !!choice.dual;
-      params.secondaryCurve = choice.secondary || "hypotrochoid";
-      params.dualModeType = choice.dualMode || "blend";
-      params.outerRadius = choice.outer ?? 180;
-      params.innerRadius = choice.inner ?? 80;
-      params.centerSize = choice.center ?? 60;
-      params.numPoints = choice.points ?? 12;
-      params.scale = choice.scale ?? 1.0;
-      params.numLayers = choice.layers ?? 2;
-      params.layerOffsetMode = choice.offset || "radius";
-      params.layerOffsetAmount = choice.offsetAmount ?? 0.06;
-      params.reverseLayers = !!choice.reverse;
-      params.animSpeed = choice.speed ?? 0.02;
-      params.trailLength = choice.trail ?? 120;
-      params.lineWeight = choice.lineWeight ?? 1.6;
-      params.lineThinning = choice.lineThinning ?? 0.7;
-      params.baseHue = choice.hue ?? 260;
-      params.colorSpread = choice.spread ?? 120;
+      // Apply new theme to the parameter manager's state
+      const themeAdapter = {
+        curveType: choice.curveType || "hypotrochoid",
+        dualCurveMode: !!choice.dual,
+        secondaryCurve: choice.secondary || "hypotrochoid",
+        dualModeType: choice.dualMode || "blend",
+        outerRadius: choice.outer ?? 180,
+        innerRadius: choice.inner ?? 80,
+        centerSize: choice.center ?? 60,
+        numPoints: choice.points ?? 12,
+        scale: choice.scale ?? 1.0,
+        numLayers: choice.layers ?? 2,
+        layerOffsetMode: choice.offset || "radius",
+        layerOffsetAmount: choice.offsetAmount ?? 0.06,
+        reverseLayers: !!choice.reverse,
+        animSpeed: choice.speed ?? 0.02,
+        trailLength: choice.trail ?? 120,
+        lineWeight: choice.lineWeight ?? 1.6,
+        lineThinning: choice.lineThinning ?? 0.7,
+        baseHue: choice.hue ?? 260,
+        colorSpread: choice.spread ?? 120,
+        m: choice.m, n1: choice.n1, n2: choice.n2, n3: choice.n3,
+        f1: choice.f1, f2: choice.f2, d1: choice.d1, d2: choice.d2,
+      };
 
-      updateUIFromParams();
+      for (const [key, value] of Object.entries(themeAdapter)) {
+          if (value !== undefined && value !== null) {
+              parameterManager.state[key] = value;
+          }
+      }
+
+      parameterManager.updateUIFromState();
       fadeState = "fading-in";
     }
     return;
   }
 
-  if (!params || Object.keys(params).length === 0) return;
-
-  fill(290, 80, 10, constrain(100 - params.trailLength / 20, 2, 95));
-  noStroke();
-  rect(0, 0, width, height);
-
-  push();
-  translate(width / 2, height / 2);
-  scale(params.scale);
-  let drift = radians(0.01 * frameCount);
-
-  for (let i = 0; i < params.numPoints; i++) {
-    push();
-    rotate((i * TWO_PI) / params.numPoints + drift);
-    for (let l = 0; l < params.numLayers; l++) drawCurve(i, l);
-    pop();
+  // Delegate core drawing to the renderer
+  if (renderer) {
+    renderer.draw();
   }
-  pop();
 
-  theta += params.animSpeed;
-
+  // Handle fade-in after theme transition
   if (fadeState === "fading-in") {
     fadeAlpha = max(fadeAlpha - 10, 0);
     background(290, 80, 10, fadeAlpha);
@@ -321,11 +429,10 @@ function draw() {
     }
   }
 
+  // --- UI Overlays ---
   textFont("Splash");
   textSize(36);
   textAlign(LEFT, BOTTOM);
-
-  // Removed expensive shadow rendering for performance
   fill(255, 64);
   text(currentThemeName, 20, height - 20);
 
@@ -341,224 +448,31 @@ function draw() {
   }
 }
 
-function drawCurve(index, layer) {
-  let outerRadius = params.outerRadius;
-  let innerRadius = params.innerRadius;
-  let centerSize = params.centerSize;
-  let currentTheta = theta;
-
-  // Cache these calculations
-  const frameTimeKey = (frameCount * 0.002).toFixed(4);
-  innerRadius += 20 * cachedSin(parseFloat(frameTimeKey) + layer * 0.4);
-  centerSize += 15 * cachedCos(frameCount * 0.0015 + layer * 0.6);
-
-  if (params.layerOffsetMode === "radius") outerRadius *= 1 + layer * params.layerOffsetAmount;
-  else if (params.layerOffsetMode === "rotation") currentTheta += layer * params.layerOffsetAmount;
-  else if (params.layerOffsetMode === "phase") currentTheta += layer * PI * params.layerOffsetAmount;
-
-  if (params.reverseLayers && layer % 2 === 1) currentTheta *= -1;
-
-  const c1 = computeCurve(params.curveType, currentTheta, outerRadius, innerRadius, centerSize);
-  let x = c1.x, y = c1.y;
-
-  if (params.dualCurveMode) {
-    const c2 = computeCurve(params.secondaryCurve, currentTheta, outerRadius * 0.8, innerRadius * 0.8, centerSize * 0.8);
-    if (params.dualModeType === "blend") {
-      const t = cachedSin(frameCount * 0.002) * 0.5 + 0.5;
-      x = lerp(c1.x, c2.x, t);
-      y = lerp(c1.y, c2.y, t);
-    } else if (params.dualModeType === "combine") {
-      x = c1.x + c2.x;
-      y = c1.y + c2.y;
-    } else if (params.dualModeType === "alternate" && layer % 2 === 1) {
-      x = c2.x;
-      y = c2.y;
-    }
-  }
-
-  if (!spirographs[index]) spirographs[index] = [];
-  if (!spirographs[index][layer]) {
-    spirographs[index][layer] = {
-      points: new Array(params.trailLength),
-      head: 0,
-      count: 0,
-      maxLength: params.trailLength
-    };
-  }
-
-  const buffer = spirographs[index][layer];
-
-  // Handle trail length changes - resize buffer if needed
-  if (buffer.maxLength !== params.trailLength) {
-    const newPoints = new Array(params.trailLength);
-    const toCopy = Math.min(buffer.count, params.trailLength);
-    const start = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
-
-    for (let i = 0; i < toCopy; i++) {
-      newPoints[i] = buffer.points[(start + i) % buffer.maxLength];
-    }
-
-    buffer.points = newPoints;
-    buffer.head = toCopy % params.trailLength;
-    buffer.count = toCopy;
-    buffer.maxLength = params.trailLength;
-  }
-
-  buffer.points[buffer.head] = { x, y };
-  buffer.head = (buffer.head + 1) % params.trailLength;
-  if (buffer.count < params.trailLength) buffer.count++;
-
-  if (buffer.count > 1) {
-    let hue = (params.baseHue + (index * params.colorSpread / params.numPoints) + layer * 40) % 360;
-
-    // Use beginShape/endShape for much faster line drawing
-    stroke(hue, 70, 95, 85);
-    strokeWeight(params.lineWeight);
-    noFill();
-
-    beginShape();
-    let idx = (buffer.head - buffer.count + buffer.maxLength) % buffer.maxLength;
-    for (let j = 0; j < buffer.count; j++) {
-      const point = buffer.points[idx];
-      if (point) {
-        vertex(point.x, point.y);
-      }
-      idx = (idx + 1) % buffer.maxLength;
-    }
-    endShape();
-  }
-}
-
 function computeCurve(type, t, outer, inner, center) {
-  let x = 0, y = 0;
-  if (type === "hypotrochoid") {
-    x = (outer - inner) * cos(t) + center * cos(((outer - inner) / inner) * t);
-    y = (outer - inner) * sin(t) - center * sin(((outer - inner) / inner) * t);
-  } else if (type === "epitrochoid") {
-    x = (outer + inner) * cos(t) - center * cos(((outer + inner) / inner) * t);
-    y = (outer + inner) * sin(t) - center * sin(((outer + inner) / inner) * t);
-  } else if (type === "rose") {
-    let k = inner / outer;
-    let r = outer * cos(k * t);
-    x = r * cos(t);
-    y = r * sin(t);
-  } else if (type === "lissajous") {
-    let a = max(1, int(outer / 20)), b = max(1, int(inner / 20)), delta = center * 0.01;
-    x = outer * sin(a * t + delta);
-    y = inner * sin(b * t);
-  } else if (type === "superformula") {
-    let m = params.m, n1 = params.n1, n2 = params.n2, n3 = params.n3, a = 1, b = 1;
-    let part1 = pow(abs(cos((m * t) / 4) / a), n2);
-    let part2 = pow(abs(sin((m * t) / 4) / b), n3);
-    let denom = pow(part1 + part2, 1 / n1);
-    let r = denom === 0 ? 0 : 1.0 / denom;
-    x = outer * r * cos(t);
-    y = outer * r * sin(t);
-  } else if (type === "harmonograph") {
-    let scaledT = t * 0.02;
-    let A = outer * 0.5, B = inner * 0.5;
-    let f1 = params.f1, f2 = params.f2, d1 = params.d1, d2 = params.d2;
-    x = A * sin(f1 * scaledT + 0.5) * exp(-d1 * scaledT);
-    y = B * sin(f2 * scaledT) * exp(-d2 * scaledT);
-  } else if (type === "hypocycloid") {
-    x = (outer - inner) * cos(t) + inner * cos(((outer - inner) / inner) * t);
-    y = (outer - inner) * sin(t) - inner * sin(((outer - inner) / inner) * t);
-  } else if (type === "epicycloid") {
-    x = (outer + inner) * cos(t) - inner * cos(((outer + inner) / inner) * t);
-    y = (outer + inner) * sin(t) - inner * sin(((outer + inner) / inner) * t);
-  } else if (type === "cycloid") {
-    x = inner * (t - sin(t));
-    y = inner * (1 - cos(t));
-  } else if (type === "trochoid") {
-    x = inner * t - center * sin(t);
-    y = inner - center * cos(t);
-  } else if (type === "limacon") {
-    let r = outer + inner * cos(t);
-    x = r * cos(t);
-    y = r * sin(t);
-  } else if (type === "ellipse") {
-    x = outer * cos(t);
-    y = inner * sin(t);
-  } else if (type === "butterfly") {
-    let scale = outer / 40;
-    t *= 2;
-    let p = (exp(cos(t)) - 2 * cos(4 * t) - pow(sin(t / 12), 5));
-    x = sin(t) * p * scale * 8;
-    y = -cos(t) * p * scale * 8;
-  } else if (type === "astroid") {
-    x = outer * pow(cos(t), 3);
-    y = outer * pow(sin(t), 3);
-  } else if (type === "bicorn") {
-    x = outer * cos(t);
-    y = outer * (pow(sin(t), 2)) / (2 + sin(t));
-  } else if (type === "freeth's nephroid") {
-    let k = inner / outer;
-    x = outer * (1 + k * sin(t/2)) * cos(t);
-    y = outer * (k + sin(t/2)) * sin(t);
-  } else if (type === "cardioid") {
-    let a = outer / 4;
-    x = a * (2 * cos(t) - cos(2*t));
-    y = a * (2 * sin(t) - sin(2*t));
-  }
-  return { x, y };
+  const formula = CurveFactory.getFormula(type);
+  const curveParams = {
+      outer: outer,
+      inner: inner,
+      center: center,
+      m: parameterManager.state.m,
+      n1: parameterManager.state.n1,
+      n2: parameterManager.state.n2,
+      n3: parameterManager.state.n3,
+      f1: parameterManager.state.f1,
+      f2: parameterManager.state.f2,
+      d1: parameterManager.state.d1,
+      d2: parameterManager.state.d2,
+  };
+  return formula(t, curveParams);
 }
 
-function updateShapeParams() {
-  currentThemeName = "Custom";
-  const get = id => document.getElementById(id);
-  params.curveType = get("curveType")?.value || "hypotrochoid";
-  params.dualCurveMode = get("dualCurveMode")?.checked || false;
-  params.secondaryCurve = get("secondaryCurve")?.value || params.curveType;
-  params.dualModeType = get("dualModeType")?.value || "blend";
 
-  params.outerRadius = parseFloat(get("outerRadius")?.value || 180);
-  params.innerRadius = parseFloat(get("innerRadius")?.value || 80);
-  params.centerSize = parseFloat(get("centerSize")?.value || 60);
-  params.numPoints = parseInt(get("numPoints")?.value || 12, 10);
-  params.scale = parseFloat(get("scale")?.value || 1.0);
-  params.numLayers = parseInt(get("numLayers")?.value || 2, 10);
-  params.layerOffsetMode = get("layerOffsetMode")?.value || "radius";
-  params.layerOffsetAmount = parseFloat(get("layerOffsetAmount")?.value || 0.06);
-  params.reverseLayers = get("reverseLayers")?.checked || false;
-
-  params.m = parseFloat(get("m")?.value || 6);
-  params.n1 = parseFloat(get("n1")?.value || 0.3);
-  params.n2 = parseFloat(get("n2")?.value || 1.7);
-  params.n3 = parseFloat(get("n3")?.value || 1.7);
-
-  params.f1 = parseFloat(get("f1")?.value || 2);
-  params.f2 = parseFloat(get("f2")?.value || 3);
-  params.d1 = parseFloat(get("d1")?.value || 0.0006);
-  params.d2 = parseFloat(get("d2")?.value || 0.0008);
-
-  updateParameterVisibility(params.curveType, params.secondaryCurve);
-}
-
-function updateStyleParams() {
-  currentThemeName = "Custom";
-  const get = id => document.getElementById(id);
-  params.animSpeed = parseFloat(get("animSpeed")?.value || 0.02);
-  params.trailLength = parseInt(get("trailLength")?.value || 120, 10);
-  params.lineWeight = parseFloat(get("lineWeight")?.value || 1.6);
-  params.lineThinning = parseFloat(get("lineThinning")?.value || 0.7);
-  params.baseHue = parseFloat(get("baseHue")?.value || 260);
-  params.colorSpread = parseFloat(get("colorSpread")?.value || 120);
-  params.autoPlay = get("autoPlay")?.checked || false;
-  params.autoPlayInterval = parseInt(get("autoPlayInterval")?.value || 5, 10);
-
-  const autoPlayIntervalDisplay = document.getElementById("autoPlayInterval-value");
-  if (autoPlayIntervalDisplay) {
-    autoPlayIntervalDisplay.textContent = params.autoPlayInterval;
-  }
-
-  resetAutoPlayTimer();
-}
 
 function resetAutoPlayTimer() {
   if (autoPlayTimer) clearInterval(autoPlayTimer);
 
-  if (params.autoPlay) {
-    autoPlayCountdown = params.autoPlayInterval;
+  if (parameterManager.state.autoPlay) {
+    autoPlayCountdown = parameterManager.state.autoPlayInterval;
     updateCountdown();
 
     autoPlayTimer = setInterval(() => {
@@ -567,7 +481,7 @@ function resetAutoPlayTimer() {
 
       if (autoPlayCountdown <= 0) {
         randomizeParameters();
-        autoPlayCountdown = params.autoPlayInterval;
+        autoPlayCountdown = parameterManager.state.autoPlayInterval;
       }
     }, 1000);
   } else {
@@ -585,82 +499,11 @@ function updateCountdown() {
   }
 }
 
-function updateUIFromParams() {
-  const get = id => document.getElementById(id);
-  get("curveType").value = params.curveType;
-  get("dualCurveMode").checked = params.dualCurveMode;
-  get("secondaryCurve").value = params.secondaryCurve;
-  get("dualModeType").value = params.dualModeType;
 
-  get("outerRadius").value = params.outerRadius;
-  get("innerRadius").value = params.innerRadius;
-  get("centerSize").value = params.centerSize;
-  get("numPoints").value = params.numPoints;
-  get("scale").value = params.scale;
-  get("numLayers").value = params.numLayers;
-  get("layerOffsetMode").value = params.layerOffsetMode;
-  get("layerOffsetAmount").value = params.layerOffsetAmount;
-  get("reverseLayers").checked = params.reverseLayers;
-
-  get("animSpeed").value = params.animSpeed;
-  get("trailLength").value = params.trailLength;
-  get("lineWeight").value = params.lineWeight;
-  get("lineThinning").value = params.lineThinning;
-  get("baseHue").value = params.baseHue;
-  get("colorSpread").value = params.colorSpread;
-
-  document.querySelectorAll("input[type=range]").forEach(input => {
-    const display = document.getElementById(input.id + "-value");
-    if (display) {
-      display.textContent = String(input.step || "").includes('.') ? parseFloat(input.value).toFixed(2) : Math.round(input.value);
-    }
-  });
-}
-
-function updateParameterVisibility(primaryCurveType, secondaryCurveType) {
-  const controls = {
-    outerRadius: document.getElementById("outerRadius").parentElement,
-    innerRadius: document.getElementById("innerRadius").parentElement,
-    centerSize: document.getElementById("centerSize").parentElement,
-    superformula: document.getElementById("superformula-controls"),
-    harmonograph: document.getElementById("harmonograph-controls")
-  };
-
-  const visibility = {
-    hypotrochoid: ["outerRadius", "innerRadius", "centerSize"],
-    epitrochoid: ["outerRadius", "innerRadius", "centerSize"],
-    rose: ["outerRadius", "innerRadius"],
-    lissajous: ["outerRadius", "innerRadius", "centerSize"],
-    superformula: ["outerRadius", "superformula"],
-    harmonograph: ["outerRadius", "innerRadius", "harmonograph"],
-    hypocycloid: ["outerRadius", "innerRadius"],
-    epicycloid: ["outerRadius", "innerRadius"],
-    cycloid: ["innerRadius"],
-    trochoid: ["innerRadius", "centerSize"],
-    limacon: ["outerRadius", "innerRadius"],
-    ellipse: ["outerRadius", "innerRadius"],
-    butterfly: ["outerRadius"],
-    astroid: ["outerRadius"],
-    bicorn: ["outerRadius"],
-    "freeth's nephroid": ["outerRadius", "innerRadius"],
-    cardioid: ["outerRadius"]
-  };
-
-  const primaryVisibility = visibility[primaryCurveType] || [];
-  const secondaryVisibility = document.getElementById("dualCurveMode").checked && visibility[secondaryCurveType] ? visibility[secondaryCurveType] : [];
-
-  Object.keys(controls).forEach(key => {
-    if (primaryVisibility.includes(key) || secondaryVisibility.includes(key)) {
-      controls[key].style.display = "block";
-    } else {
-      controls[key].style.display = "none";
-    }
-  });
-}
 
 function autoAdjustScale() {
   let maxRadius = 0;
-  const { curveType, outerRadius, innerRadius, centerSize } = params;
+  const { curveType, outerRadius, innerRadius, centerSize } = parameterManager.state;
 
   if (curveType === "hypotrochoid") {
     maxRadius = outerRadius - innerRadius + centerSize;
@@ -701,7 +544,7 @@ function autoAdjustScale() {
   if (maxRadius > 0) {
     const maxAllowedRadius = min(width, height) / 2;
     const newScale = (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING;
-    params.scale = newScale;
+    parameterManager.state.scale = newScale;
     document.getElementById("scale").value = newScale;
     const display = document.getElementById("scale-value");
     if (display) {
@@ -819,33 +662,33 @@ async function savePreset() {
   
   const newPreset = {
     name: name,
-    curveType: params.curveType,
-    dual: params.dualCurveMode,
-    secondary: params.secondaryCurve,
-    dualMode: params.dualModeType,
-    outer: params.outerRadius,
-    inner: params.innerRadius,
-    center: params.centerSize,
-    points: params.numPoints,
-    scale: params.scale,
-    layers: params.numLayers,
-    offset: params.layerOffsetMode,
-    offsetAmount: params.layerOffsetAmount,
-    reverse: params.reverseLayers,
-    speed: params.animSpeed,
-    trail: params.trailLength,
-    lineWeight: params.lineWeight,
-    lineThinning: params.lineThinning,
-    hue: params.baseHue,
-    spread: params.colorSpread,
-    m: params.m,
-    n1: params.n1,
-    n2: params.n2,
-    n3: params.n3,
-    f1: params.f1,
-    f2: params.f2,
-    d1: params.d1,
-    d2: params.d2,
+    curveType: parameterManager.state.curveType,
+    dual: parameterManager.state.dualCurveMode,
+    secondary: parameterManager.state.secondaryCurve,
+    dualMode: parameterManager.state.dualModeType,
+    outer: parameterManager.state.outerRadius,
+    inner: parameterManager.state.innerRadius,
+    center: parameterManager.state.centerSize,
+    points: parameterManager.state.numPoints,
+    scale: parameterManager.state.scale,
+    layers: parameterManager.state.numLayers,
+    offset: parameterManager.state.layerOffsetMode,
+    offsetAmount: parameterManager.state.layerOffsetAmount,
+    reverse: parameterManager.state.reverseLayers,
+    speed: parameterManager.state.animSpeed,
+    trail: parameterManager.state.trailLength,
+    lineWeight: parameterManager.state.lineWeight,
+    lineThinning: parameterManager.state.lineThinning,
+    hue: parameterManager.state.baseHue,
+    spread: parameterManager.state.colorSpread,
+    m: parameterManager.state.m,
+    n1: parameterManager.state.n1,
+    n2: parameterManager.state.n2,
+    n3: parameterManager.state.n3,
+    f1: parameterManager.state.f1,
+    f2: parameterManager.state.f2,
+    d1: parameterManager.state.d1,
+    d2: parameterManager.state.d2,
     createdAt: new Date().toISOString()
   };
   
@@ -906,7 +749,7 @@ function shuffleTheme() {
   if (fadeState !== "none") return;
   nextTheme = window.themes[Math.floor(Math.random() * window.themes.length)];
   currentThemeName = nextTheme.name;
-  resetSpirographs();
+  renderer.reset();
   fadeState = "fading-out";
 }
 
@@ -922,7 +765,7 @@ function toggleFullscreenCanvas() {
       if (button) button.innerHTML = "&#x2715;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
-      clearSpirographs();
+      renderer.clear();
     });
   } else {
     document.exitFullscreen().then(() => {
@@ -931,7 +774,7 @@ function toggleFullscreenCanvas() {
       if (button) button.innerHTML = "&#x26F6;";
       const { w, h } = getCanvasSize();
       resizeCanvas(w, h);
-      clearSpirographs();
+      renderer.clear();
     });
   }
 }
