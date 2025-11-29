@@ -12,7 +12,7 @@ class ParameterManager {
       "outerRadius", "innerRadius", "centerSize", "numPoints", "scale",
       "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers",
       // Style
-      "animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread",
+      "animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread", "colorMode",
       // Advanced
       "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2",
       // Auto-play

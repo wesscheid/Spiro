@@ -2,6 +2,7 @@ let parameterManager;
 let spirographs = [];
 let theta = 0;
 let renderer;
+let orrery;
 let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
@@ -44,11 +45,6 @@ class SpiroRenderer {
     draw() {
         const { state } = this.parameterManager;
         if (!state) return;
-
-        // Fill with a transparent version of the new background color for the trail effect
-        fill(224, 39, 11, constrain(100 - state.trailLength / 20, 2, 95));
-        noStroke();
-        rect(0, 0, width, height);
 
         push();
         translate(width / 2, height / 2);
@@ -100,91 +96,263 @@ class SpiroRenderer {
             }
         }
 
-                if (!this.spirographs[index]) this.spirographs[index] = [];
+        if (!this.spirographs[index]) this.spirographs[index] = [];
+        if (!this.spirographs[index][layer]) {
+            // Create a buffer with the maximum possible size ONCE.
+            this.spirographs[index][layer] = {
+                points: new Array(400),
+                head: 0,
+            };
+        }
 
-                if (!this.spirographs[index][layer]) {
-
-                    // Create a buffer with the maximum possible size ONCE.
-
-                    this.spirographs[index][layer] = {
-
-                        points: new Array(400),
-
-                        head: 0,
-
-                    };
-
-                }
-
+        const buffer = this.spirographs[index][layer];
         
+        // Write the new point to the physical buffer.
+        buffer.points[buffer.head] = { x, y };
+        buffer.head = (buffer.head + 1) % 400;
 
-                const buffer = this.spirographs[index][layer];
+        const numToDraw = Math.floor(state.trailLength);
 
-                
+        if (numToDraw > 1) {
+            let currentHue = state.baseHue;
+            let currentSaturation = 70; // Keeping these fixed for now as per original
+            let currentBrightness = 95; // Keeping these fixed for now as per original
+            let currentAlpha = 85;    // Keeping these fixed for now as per original
 
-                // Write the new point to the physical buffer.
-
-                buffer.points[buffer.head] = { x, y };
-
-                buffer.head = (buffer.head + 1) % 400;
-
-        
-
-                const numToDraw = Math.floor(state.trailLength);
-
-        
-
-                if (numToDraw > 1) {
-
-                    let hue = (state.baseHue + (index * state.colorSpread / state.numPoints) + layer * 40) % 360;
-
-                    stroke(hue, 70, 95, 85);
-
+            switch (state.colorMode) {
+                case "byPoint":
+                    // High contrast: Step by spread + fixed offset instead of distributing spread
+                    currentHue = (state.baseHue + (index * (state.colorSpread + 45))) % 360;
+                    stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
                     noFill();
-
-        
-
-                    const minWeight = state.lineWeight * (1 - state.lineThinning);
-
-        
-
-                    // Backtrack from the head to draw the trail.
-
-                    for (let j = 0; j < numToDraw - 1; j++) {
-
-                        // j=0 is the segment closest to the head (newest)
-
-                        const p1_idx = (buffer.head - 1 - j + 400) % 400;
-
-                        const p2_idx = (buffer.head - 2 - j + 400) % 400;
-
-                        
-
-                        const p1 = buffer.points[p1_idx];
-
-                        const p2 = buffer.points[p2_idx];
-
-        
-
-                        if (p1 && p2) {
-
-                            // progress=1 is the newest segment, progress=0 is the oldest.
-
-                            const progress = (numToDraw - 1 - j) / (numToDraw - 1);
-
-                            const weight = lerp(minWeight, state.lineWeight, progress);
-
-                            strokeWeight(weight);
-
-                            line(p1.x, p1.y, p2.x, p2.y);
-
-                        }
-
-                    }
-
-                }
-
+                    break;
+                case "byLayer":
+                    // High contrast: Step by spread + large offset (135deg) for distinct bands
+                    currentHue = (state.baseHue + (layer * (state.colorSpread + 135))) % 360;
+                    stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
+                    noFill();
+                    break;
+                case "gradient":
+                    // Stroke will be set per segment within the loop
+                    noFill();
+                    break;
+                case "mono":
+                    currentHue = state.baseHue;
+                    stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
+                    noFill();
+                    break;
+                case "rainbow":
+                    currentHue = (state.baseHue + (index * state.colorSpread / state.numPoints) + layer * 40) % 360;
+                    stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
+                    noFill();
+                    break;
             }
+
+            const minWeight = state.lineWeight * (1 - state.lineThinning);
+
+            // Backtrack from the head to draw the trail.
+            for (let j = 0; j < numToDraw - 1; j++) {
+                const p1_idx = (buffer.head - 1 - j + 400) % 400;
+                const p2_idx = (buffer.head - 2 - j + 400) % 400;
+                
+                const p1 = buffer.points[p1_idx];
+                const p2 = buffer.points[p2_idx];
+
+                if (p1 && p2) {
+                    const progress = (numToDraw - 1 - j) / (numToDraw - 1);
+                    const weight = lerp(minWeight, state.lineWeight, progress);
+                    strokeWeight(weight);
+
+                    if (state.colorMode === "gradient") {
+                        currentHue = (state.baseHue + (progress * state.colorSpread)) % 360;
+                        stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
+                    }
+                    line(p1.x, p1.y, p2.x, p2.y);
+                }
+            }
+        }
+    }
+}
+
+class Orrery {
+    constructor(parameterManager, renderer) {
+        this.parameterManager = parameterManager;
+        this.renderer = renderer;
+        this.dragState = null; // 'outer', 'inner', 'pen', or null
+        this.hoverState = null;
+    }
+
+    getComponentPositions() {
+        const { state } = this.parameterManager;
+        const theta = this.renderer.theta;
+        const R = state.outerRadius;
+        const r = state.innerRadius;
+        const d = state.centerSize;
+
+        let innerX, innerY;
+        if (state.curveType.startsWith("epi")) {
+            innerX = (R + r) * cos(theta);
+            innerY = (R + r) * sin(theta);
+        } else { // hypo
+            innerX = (R - r) * cos(theta);
+            innerY = (R - r) * sin(theta);
+        }
+
+        let angle = ((R - r) / r) * theta;
+        if (state.curveType.startsWith("epi")) {
+           angle = ((R + r) / r) * theta;
+        }
+
+        // Subtract sin because y-axis is inverted in p5 relative to standard cartesian
+        const penX = innerX + d * cos(angle);
+        const penY = innerY - d * sin(angle);
+
+        return { innerX, innerY, penX, penY };
+    }
+
+    // Convert screen coordinates (mouse) to canvas space (taking translate/scale into account)
+    toCanvasSpace(mx, my) {
+        const { state } = this.parameterManager;
+        const centeredX = mx - width / 2;
+        const centeredY = my - height / 2;
+        return {
+            x: centeredX / state.scale,
+            y: centeredY / state.scale
+        };
+    }
+
+    checkHover(mx, my) {
+        if (this.dragState) return; // Don't change hover while dragging
+
+        const { state } = this.parameterManager;
+        const pos = this.toCanvasSpace(mx, my);
+        const comps = this.getComponentPositions();
+        const distFromCenter = dist(0, 0, pos.x, pos.y);
+        const distFromInner = dist(comps.innerX, comps.innerY, pos.x, pos.y);
+        const distFromPen = dist(comps.penX, comps.penY, pos.x, pos.y);
+
+        // Thresholds for detection (scaled relative to view, but here we work in unscaled logic coords)
+        const hitBuffer = 10 / state.scale; 
+
+        if (distFromPen < 15 / state.scale) {
+            this.hoverState = 'pen';
+        } else if (Math.abs(distFromInner - state.innerRadius) < hitBuffer) {
+            this.hoverState = 'inner';
+        } else if (Math.abs(distFromCenter - state.outerRadius) < hitBuffer) {
+            this.hoverState = 'outer';
+        } else {
+            this.hoverState = null;
+        }
+    }
+
+    handlePress(mx, my) {
+        this.checkHover(mx, my);
+        if (this.hoverState) {
+            this.dragState = this.hoverState;
+            return true; // Captured
+        }
+        return false;
+    }
+
+    handleDrag(mx, my) {
+        if (!this.dragState) return;
+
+        const { state } = this.parameterManager;
+        const pos = this.toCanvasSpace(mx, my);
+        const comps = this.getComponentPositions();
+
+        if (this.dragState === 'outer') {
+            const newRadius = dist(0, 0, pos.x, pos.y);
+            state.outerRadius = Math.max(10, Math.min(400, newRadius));
+        } else if (this.dragState === 'inner') {
+            // Distance from the *current* center of the inner circle
+            const newRadius = dist(comps.innerX, comps.innerY, pos.x, pos.y);
+            state.innerRadius = Math.max(5, Math.min(300, newRadius));
+        } else if (this.dragState === 'pen') {
+            // Distance from the center of the inner circle to mouse
+            const newOffset = dist(comps.innerX, comps.innerY, pos.x, pos.y);
+            state.centerSize = Math.max(0, Math.min(300, newOffset));
+        }
+
+        this.parameterManager.updateUIFromState();
+        // We don't reset the renderer here to allow for smooth live-adjustment effect
+        // But we might want to if the trails get messy. 
+        // For now, let's reset to keep it clean.
+        this.renderer.reset(); 
+    }
+
+    handleRelease() {
+        this.dragState = null;
+    }
+
+    draw() {
+        const { state } = this.parameterManager;
+        
+        // Only draw for trochoid-based curves
+        const supportedCurves = ["hypotrochoid", "epitrochoid", "hypocycloid", "epicycloid"];
+        if (!supportedCurves.includes(state.curveType)) {
+            return;
+        }
+
+        const comps = this.getComponentPositions();
+
+        push();
+        translate(width / 2, height / 2);
+        scale(state.scale);
+
+        const strokeScale = 1 / state.scale;
+        strokeWeight(strokeScale);
+        
+        // Colors
+        const colGhost = color(180, 5, 100, 20); 
+        const colActive = color(25, 100, 100, 100); // Neon Orange
+        const colHover = color(25, 100, 100, 50);   // Dimmer Orange
+
+        noFill();
+
+        // 1. Outer Circle
+        if (this.dragState === 'outer' || this.hoverState === 'outer') {
+            stroke(this.dragState === 'outer' ? colActive : colHover);
+            strokeWeight(2 * strokeScale);
+        } else {
+            stroke(colGhost);
+            strokeWeight(strokeScale);
+        }
+        circle(0, 0, state.outerRadius * 2);
+
+        // 2. Inner Circle
+        if (this.dragState === 'inner' || this.hoverState === 'inner') {
+            stroke(this.dragState === 'inner' ? colActive : colHover);
+            strokeWeight(2 * strokeScale);
+        } else {
+            stroke(colGhost);
+            strokeWeight(strokeScale);
+        }
+        circle(comps.innerX, comps.innerY, state.innerRadius * 2);
+
+        // 3. Arm
+        stroke(25, 80, 100, 30);
+        strokeWeight(strokeScale);
+        line(comps.innerX, comps.innerY, comps.penX, comps.penY);
+        
+        // 4. Pen Tip
+        if (this.dragState === 'pen' || this.hoverState === 'pen') {
+            fill(this.dragState === 'pen' ? colActive : colHover);
+        } else {
+            fill(25, 100, 100, 80);
+        }
+        noStroke();
+        circle(comps.penX, comps.penY, 10 * strokeScale);
+
+        pop();
+        
+        // Update cursor
+        if (this.hoverState || this.dragState) {
+            cursor('pointer');
+        } else {
+            cursor('default');
+        }
+    }
 }
 
 // Auto-scale padding factor (0.75 = 25% padding on all sides)
@@ -252,6 +420,7 @@ function setup() {
 
   parameterManager = new ParameterManager();
   renderer = new SpiroRenderer(parameterManager);
+  orrery = new Orrery(parameterManager, renderer);
   setupEventListeners();
 
   // Initialize themes array if themes.js hasn't loaded yet
@@ -355,7 +524,7 @@ function setupEventListeners() {
       if (changedId === 'complexity' || changedId === 'outerRadius') {
         applyComplexity();
       }
-      resetSpirographs();
+      renderer.reset();
       resetAutoPlayTimer();
   });
 }
@@ -372,7 +541,7 @@ function draw() {
   // Handle theme transition fade
   if (fadeState === "fading-out") {
     fadeAlpha = min(fadeAlpha + 10, 255);
-    background(290, 80, 10, fadeAlpha);
+    background(224, 39, 11, fadeAlpha);
     if (fadeAlpha === 255) {
       renderer.clear();
       renderer.theta = 0;
@@ -415,15 +584,22 @@ function draw() {
     return;
   }
 
-  // Delegate core drawing to the renderer
-  if (renderer) {
-    renderer.draw();
-  }
+    // Delegate core drawing to the renderer
+
+    if (renderer) {
+
+      clear();
+
+      if(orrery) orrery.draw();
+
+      renderer.draw();
+
+    }
 
   // Handle fade-in after theme transition
   if (fadeState === "fading-in") {
     fadeAlpha = max(fadeAlpha - 10, 0);
-    background(290, 80, 10, fadeAlpha);
+    background(224, 39, 11, fadeAlpha);
     if (fadeAlpha === 0) {
       fadeState = "none";
     }
@@ -464,6 +640,36 @@ function computeCurve(type, t, outer, inner, center) {
       d2: parameterManager.state.d2,
   };
   return formula(t, curveParams);
+}
+
+function mousePressed() {
+    // Only interact if clicking on the canvas
+    if (mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
+        if (orrery && orrery.handlePress(mouseX, mouseY)) {
+            // Disable default drag behavior if we captured an object
+            return false;
+        }
+    }
+}
+
+function mouseDragged() {
+    if (orrery) {
+        orrery.handleDrag(mouseX, mouseY);
+        // Check hover state during drag to keep cursor updated
+        orrery.checkHover(mouseX, mouseY);
+    }
+}
+
+function mouseReleased() {
+    if (orrery) {
+        orrery.handleRelease();
+    }
+}
+
+function mouseMoved() {
+    if (orrery) {
+        orrery.checkHover(mouseX, mouseY);
+    }
 }
 
 
