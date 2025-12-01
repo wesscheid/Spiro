@@ -404,11 +404,12 @@ function randomizeParameters() {
 }
 
 function getCanvasSize() {
-  const controls = document.getElementById("controls");
-  const rect = controls?.getBoundingClientRect() || { width: 300, height: 300 };
-  if (fullscreenMode) return { w: window.innerWidth, h: window.innerHeight };
-  if (window.innerWidth <= 720) return { w: window.innerWidth, h: window.innerHeight - rect.height };
-  return { w: window.innerWidth - rect.width, h: window.innerHeight };
+  const container = document.getElementById("canvas-container");
+  if (container) {
+    // Use offsetWidth/Height for the actual rendered box size
+    return { w: container.offsetWidth, h: container.offsetHeight };
+  }
+  return { w: window.innerWidth, h: window.innerHeight };
 }
 
 function setup() {
@@ -536,9 +537,12 @@ function setupEventListeners() {
 }
 
 function windowResized() {
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  renderer.clear();
+  // Small delay to allow flex layout to settle (especially on mobile rotation/bar toggle)
+  setTimeout(() => {
+    const { w, h } = getCanvasSize();
+    resizeCanvas(w, h);
+    renderer.clear();
+  }, 100);
 }
 
 
