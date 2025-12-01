@@ -3,6 +3,7 @@ let spirographs = [];
 let theta = 0;
 let renderer;
 let orrery;
+let signature;
 let fullscreenMode = false;
 let canvasEl = null;
 let themeTransition = null;
@@ -13,6 +14,7 @@ let autoPlayCountdown = 0;
 let listenerController = new AbortController();
 let capturer = null;
 let isRecording = false;
+let logoImage;
 
 class SpiroRenderer {
     constructor(parameterManager) {
@@ -418,9 +420,13 @@ function setup() {
   frameRate(60);
   fadeAlpha = 0;
 
+  // Load logo asynchronously to avoid blocking if preload fails (e.g. local file CORS)
+  logoImage = loadImage('logo_ws.png');
+
   parameterManager = new ParameterManager();
   renderer = new SpiroRenderer(parameterManager);
   orrery = new Orrery(parameterManager, renderer);
+  signature = new ArtistSignature();
   setupEventListeners();
 
   // Initialize themes array if themes.js hasn't loaded yet
@@ -542,6 +548,8 @@ function draw() {
   if (fadeState === "fading-out") {
     fadeAlpha = min(fadeAlpha + 10, 255);
     background(224, 39, 11, fadeAlpha);
+    // Draw signature unconditionally during fading-out
+    if (signature) signature.draw(fadeAlpha);
     if (fadeAlpha === 255) {
       renderer.clear();
       renderer.theta = 0;
@@ -590,7 +598,7 @@ function draw() {
 
       clear();
 
-      if(orrery) orrery.draw();
+      if(orrery && parameterManager.state.showOrrery) orrery.draw();
 
       renderer.draw();
 
@@ -603,6 +611,9 @@ function draw() {
     if (fadeAlpha === 0) {
       fadeState = "none";
     }
+    // Draw signature unconditionally during fading-in
+    if (signature) signature.draw(fadeAlpha);
+    return;
   }
 
   // --- UI Overlays ---
@@ -645,7 +656,7 @@ function computeCurve(type, t, outer, inner, center) {
 function mousePressed() {
     // Only interact if clicking on the canvas
     if (mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
-        if (orrery && orrery.handlePress(mouseX, mouseY)) {
+        if (orrery && parameterManager.state.showOrrery && orrery.handlePress(mouseX, mouseY)) {
             // Disable default drag behavior if we captured an object
             return false;
         }
@@ -667,8 +678,33 @@ function mouseReleased() {
 }
 
 function mouseMoved() {
-    if (orrery) {
+    if (orrery && parameterManager.state.showOrrery) {
         orrery.checkHover(mouseX, mouseY);
+    } else {
+        cursor('default');
+    }
+}
+
+class ArtistSignature {
+    draw(currentFadeAlpha) {
+        if (!logoImage || logoImage.width === 0) return;
+
+        push();
+        translate(width/2, height/2);
+        
+        // Pulsing scale
+        scale(1 + sin(frameCount * 0.1) * 0.05);
+        
+        imageMode(CENTER);
+        tint(255, currentFadeAlpha);
+        
+        // Draw the logo, adjusting size as needed (e.g., 150x150)
+        // We use the aspect ratio of the image to ensure it's not stretched
+        let imgW = 120;
+        let imgH = 120 * (logoImage.height / logoImage.width);
+        image(logoImage, 0, 0, imgW, imgH);
+
+        pop();
     }
 }
 
@@ -779,8 +815,7 @@ async function loadCustomThemes() {
   }
   
   try {
-    // Import Firestore functions
-    const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
+    const { collection, getDocs } = window.firebaseFunctions; // Use globally exposed functions
     
     // Get all community themes from Firebase
     const querySnapshot = await getDocs(collection(window.firestore, "themes"));
@@ -852,7 +887,7 @@ function applyTheme(themeName) {
   if (theme) {
     nextTheme = theme;
     currentThemeName = theme.name;
-    resetSpirographs();
+    renderer.reset();
     fadeState = "fading-out";
   }
 }
@@ -901,7 +936,7 @@ async function savePreset() {
   if (saveType) {
     // Save to Firebase (community)
     try {
-      const { collection, addDoc } = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
+      const { collection, addDoc } = window.firebaseFunctions; // Use globally exposed functions
       
       const docRef = await addDoc(collection(window.firestore, "themes"), newPreset);
       newPreset.id = docRef.id;

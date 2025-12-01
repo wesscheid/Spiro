@@ -1,5 +1,3 @@
-# Spiro
-Animated Spiro drawings 
 # 🌀 Spirograph App
 
 A mesmerizing, interactive web app for exploring **spirograph-inspired mathematical patterns** in real time.  
@@ -9,17 +7,14 @@ Designed for creative exploration and smooth animation — built with **p5.js**,
 
 ## ✨ Features
 
-- Multiple **curve types**: Hypotrochoid, Epitrochoid, Rose, Lissajous, Superformula, and Harmonograph.
-- **Dual-curve blending** – combine or morph two curves for complex interference patterns.
-- **Multi-layer rendering** with per-layer offsets and optional reverse rotation.
-- **Dynamic line thinning** and trail fading for smooth motion.
-- **Preset themes** for quick exploration (`themes.js`).
-- **Video Capture**: Record your animations as a `webm` video file. Choose from 5, 10, or 15-second recording lengths.
-- Fully modular structure: `style.css`, `spiro.js`, and `themes.js` are separated for easy editing.
-
----
-
-## 🧩 File Structure
+- **Diverse Curve Types**: Explore Hypotrochoid, Epitrochoid, Rose, Lissajous, Superformula, and Harmonograph patterns.
+- **Cloud & Local Saving**: Save your custom themes locally or publish them to the global community library (powered by Firebase).
+- **Interactive Mechanics (Orrery)**: Toggle the "Show Mechanics" visualization in the Advanced tab to see the rotating arms and gears driving the animation.
+- **Dual-Curve Blending**: Combine or morph between two different curve types for complex interference patterns.
+- **Multi-Layer Rendering**: Stack layers with configurable offsets (radius, rotation, phase) and varying directions.
+- **Video Capture**: Record your animations directly to `webm` video files (5s, 10s, or 15s).
+- **Dynamic Styling**: Real-time control over line weight, thinning, color gradients, and "vibe" complexity.
+- **Artist Branding**: Integrated dynamic logo visualization during transitions.
 
 ---
 
@@ -46,19 +41,20 @@ You can run it directly in any modern browser.
 
 ## 🧠 Tips
 
-- Try small **Animation Speed** values (0.005–0.03) for smoother, hypnotic motion.  
-- Use the **Dual Curve Mode** to mix harmonograph and spiro formulas.  
-- **Capture Your Creations**: Use the "Capture Video" button to record your animations. A "REC" indicator will show on the canvas while recording.
-- Toggle **Reverse Alternate Layers** for rotating interference effects.  
-- Curate your favorite looks into `themes.js` and reload with the **Shuffle Theme** button.
+- **Mechanics View**: Enable "Show Mechanics" in the Advanced section to understand how the drawing arm moves.
+- **Community Themes**: Browse the "Theme" dropdown to see presets created by other users (marked with 🌐).
+- **Smooth Motion**: Try small **Animation Speed** values (0.005–0.03) for smoother, hypnotic motion.  
+- **Dual Mode**: Use the **Dual Curve Mode** to mix harmonograph and spiro formulas.  
+- **Recording**: Use the "Capture Video" button to share your creations.
 
 ---
 
 ## 🧩 Tech Stack
 
 - [p5.js](https://p5js.org/) – Creative coding framework
+- [Firebase](https://firebase.google.com/) - Cloud storage for community themes
+- [CCapture.js](https://github.com/spite/ccapture.js/) - Video recording
 - Vanilla JS + HTML + CSS  
-- Optimized for modern browsers and mobile devices  
 
 ---
 

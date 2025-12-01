@@ -14,7 +14,7 @@ class ParameterManager {
       // Style
       "animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread", "colorMode",
       // Advanced
-      "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2",
+      "showOrrery", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2",
       // Auto-play
       "autoPlay", "autoPlayInterval"
     ];
