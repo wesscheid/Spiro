@@ -366,6 +366,11 @@ function randomizeParameters() {
   const secondaryCurve = curveTypes[Math.floor(Math.random() * curveTypes.length)];
 
   currentThemeName = "Random";
+  
+  const themeSelect = document.getElementById("themeSelect");
+  if (themeSelect) {
+    themeSelect.value = "Custom";
+  }
 
   nextTheme = {
     name: "Random",
@@ -420,6 +425,7 @@ function setup() {
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
   fadeAlpha = 0;
+  currentThemeName = "Default";
 
   // Load logo asynchronously to avoid blocking if preload fails (e.g. local file CORS)
   logoImage = loadImage('logo_ws.png');
@@ -512,6 +518,8 @@ function setupEventListeners() {
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
   document.getElementById("randomizeParams")?.addEventListener("click", randomizeParameters, options);
   document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
+  document.getElementById("reloadThemes")?.addEventListener("click", reloadThemes, options);
+  document.getElementById("exportThemes")?.addEventListener("click", exportAllThemes, options);
   document.getElementById("saveImageBtn")?.addEventListener("click", saveImage, options);
   document.getElementById("captureVideoBtn")?.addEventListener("click", toggleRecording, options);
   document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
@@ -531,7 +539,30 @@ function setupEventListeners() {
       if (changedId === 'complexity' || changedId === 'outerRadius') {
         applyComplexity();
       }
-      renderer.reset();
+
+      // List of parameters that require clearing the canvas when changed
+      const resetParams = [
+        'complexity',
+        'curveType', 
+        'dualCurveMode', 
+        'secondaryCurve', 
+        'dualModeType',
+        'outerRadius', 
+        'innerRadius', 
+        'centerSize',
+        'numPoints', 
+        'numLayers', 
+        'layerOffsetMode', 
+        'layerOffsetAmount', 
+        'reverseLayers',
+        'm', 'n1', 'n2', 'n3',
+        'f1', 'f2', 'd1', 'd2'
+      ];
+
+      if (resetParams.includes(changedId)) {
+        renderer.reset();
+      }
+      
       resetAutoPlayTimer();
   });
 }
@@ -624,7 +655,7 @@ function draw() {
   textFont("Splash");
   textSize(36);
   textAlign(LEFT, BOTTOM);
-  fill(255, 64);
+  fill(255, 200);
   text(currentThemeName, 20, height - 20);
 
   if (isRecording) {
@@ -878,7 +909,21 @@ function populateThemes() {
       themeSelect.appendChild(option);
     });
 
-    themeSelect.value = currentVal;
+    if (currentVal && Array.from(themeSelect.options).some(o => o.value === currentVal)) {
+        themeSelect.value = currentVal;
+    } else {
+        // Try to find "Default", otherwise "Custom"
+        if (Array.from(themeSelect.options).some(o => o.value === "Default")) {
+            themeSelect.value = "Default";
+            // Also apply the Default theme state if we're setting it here (likely startup)
+            // But applyTheme triggers a fade/reset, which might be jarring on init.
+            // Ideally setup() already sets initial state. If setup() used defaults matching "Default" theme, we are good.
+            // Let's just set the dropdown for now.
+             currentThemeName = "Default"; 
+        } else {
+            themeSelect.value = "Custom";
+        }
+    }
   }
 }
 
@@ -986,6 +1031,51 @@ async function savePreset() {
   }
 }
 
+function reloadThemes() {
+  const oldScript = document.querySelector('script[src^="themes.js"]');
+  if (oldScript) oldScript.remove();
+
+  const script = document.createElement('script');
+  script.src = `themes.js?t=${new Date().getTime()}`;
+  script.onload = () => {
+    // Mark these as built-in
+    if (window.themes) {
+        window.themes.forEach(t => t.isBuiltIn = true);
+    }
+    
+    // Re-load custom themes (local + community)
+    loadCustomThemes().then(() => {
+        populateThemes();
+        alert("Themes reloaded successfully!");
+    });
+  };
+  script.onerror = () => {
+    alert("Failed to reload themes.js");
+  };
+  document.body.appendChild(script);
+}
+
+function exportAllThemes() {
+  if (!window.themes || window.themes.length === 0) {
+    alert("No themes to export!");
+    return;
+  }
+
+  // Create a clean copy of themes, removing internal flags if desired, 
+  // or keep them to preserve origin info (community vs local). 
+  // Here we'll export everything as is.
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.themes, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  
+  const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+  downloadAnchorNode.setAttribute("download", `spiralmuse_themes_${timestamp}.json`);
+  
+  document.body.appendChild(downloadAnchorNode); // Required for firefox
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+}
+
 let nextTheme = null;
 let currentThemeName = "";
 
@@ -994,6 +1084,13 @@ function shuffleTheme() {
   if (fadeState !== "none") return;
   nextTheme = window.themes[Math.floor(Math.random() * window.themes.length)];
   currentThemeName = nextTheme.name;
+  
+  // Update the dropdown to match the selected theme
+  const themeSelect = document.getElementById("themeSelect");
+  if (themeSelect) {
+      themeSelect.value = nextTheme.name;
+  }
+  
   renderer.reset();
   fadeState = "fading-out";
 }

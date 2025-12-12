@@ -8,8 +8,10 @@ Designed for creative exploration and smooth animation — built with **p5.js**,
 ## ✨ Features
 
 - **Diverse Curve Types**: Explore Hypotrochoid, Epitrochoid, Rose, Lissajous, Superformula, and Harmonograph patterns.
+- **Smart Rendering**: Adjust colors, line styles, and zoom levels *without* clearing the canvas—only shape-altering parameters trigger a redraw.
 - **Cloud & Local Saving**: Save your custom themes locally or publish them to the global community library (powered by Firebase).
-- **Interactive Mechanics (Orrery)**: Toggle the "Show Mechanics" visualization in the Advanced tab to see the rotating arms and gears driving the animation.
+- **Enhanced Theme Management**: Export your entire theme library (local + cloud) to JSON for backup. Edit `themes.js` locally and reload instantly via the UI without refreshing.
+- **Interactive Mechanics (Orrery)**: Toggle the "Show Mechanics" visualization (default: off) to see the rotating arms and gears driving the animation.
 - **Dual-Curve Blending**: Combine or morph between two different curve types for complex interference patterns.
 - **Multi-Layer Rendering**: Stack layers with configurable offsets (radius, rotation, phase) and varying directions.
 - **Video Capture**: Record your animations directly to `webm` video files (5s, 10s, or 15s).
@@ -26,6 +28,7 @@ You can run it directly in any modern browser.
 1. Clone or download the repository.
 2. Open `index.html` in your browser.
 3. Adjust sliders and settings to create unique spiro patterns.
+4. **Tip:** You can edit `themes.js` locally to add your own built-in presets, then hit "Reload Themes.js" in the Advanced tab to see changes instantly.
 
 ### **2. Host via GitHub Pages**
 1. Go to your repo → **Settings → Pages**.
@@ -41,6 +44,7 @@ You can run it directly in any modern browser.
 
 ## 🧠 Tips
 
+- **Auto Randomize**: Enable "Auto Randomize" in the Advanced section to cycle through infinite random variations automatically.
 - **Mechanics View**: Enable "Show Mechanics" in the Advanced section to understand how the drawing arm moves.
 - **Community Themes**: Browse the "Theme" dropdown to see presets created by other users (marked with 🌐).
 - **Smooth Motion**: Try small **Animation Speed** values (0.005–0.03) for smoother, hypnotic motion.  

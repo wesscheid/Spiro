@@ -21,8 +21,7 @@
   <div id="controls">
     
     <div id="branding-header">
-      <h1>SpiralMuse</h1>
-      <p class="tagline">A digital kaleidoscope with a physics degree</p>
+      <img id="logo-img" src="spiralmuse_cropped.png" alt="SpiralMuse Logo">
     </div>
 
     <div class="vibe-controls">
@@ -36,6 +35,10 @@
       </div>
        <div class="control-group">
           <button id="shuffleTheme" class="primary">Shuffle Theme</button>
+       </div>
+       <div class="control-group">
+          <button id="randomizeParams">Randomize All</button>
+          <button id="savePreset" style="margin-top: 8px;">Save as Theme</button>
        </div>
     </div>
 
@@ -231,19 +234,14 @@
         </div>
         <div class="details-section-content">
           <div class="control-group">
-            <label><input type="checkbox" id="showOrrery" checked> Show Mechanics</label>
+            <label><input type="checkbox" id="showOrrery"> Show Mechanics</label>
           </div>
           <div class="control-group">
-            <label><input type="checkbox" id="autoPlay"> Auto-play Themes</label>
-          </div>
-          <div class="control-group" id="autoPlay-slider-container">
-            <label for="autoPlayInterval">Interval (s) <span id="autoPlayInterval-value" class="value-display"></span></label>
-            <input id="autoPlayInterval" type="range" min="1" max="30" step="1" value="5">
-            <small>Next change in: <span id="autoPlayCountdown">--</span>s</small>
+            <label><input type="checkbox" id="autoPlay"> Auto Randomize</label>
           </div>
            <div class="control-group">
-            <button id="randomizeParams">Randomize All</button>
-            <button id="savePreset" style="margin-top: 8px;">Save as Theme</button>
+            <button id="reloadThemes">Reload Themes.js</button>
+            <button id="exportThemes" style="margin-top: 8px;">Export All Themes</button>
           </div>
           <hr style="border-color: #2a2a2a; margin: 20px 0;">
           <div class="control-group" id="superformula-controls" style="display: none;">

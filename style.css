@@ -64,25 +64,17 @@ canvas {
    ================================= */
 #branding-header {
   margin-bottom: 24px;
-  text-align: left;
+  text-align: right; /* Align logo to the right */
+  display: flex; /* Use flexbox for positioning */
+  justify-content: flex-end; /* Push content to the right */
+  align-items: center; /* Vertically center the image if needed */
 }
 
-#branding-header h1 {
-  margin: 0;
-  font-family: 'Splash', cursive; /* Using the font already loaded */
-  font-size: 32px;
-  color: var(--text-color);
-  letter-spacing: 2px;
-  line-height: 1;
-}
-
-#branding-header .tagline {
-  margin: 4px 0 0 0;
-  font-size: 12px;
-  color: var(--accent-hot);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 500;
+#branding-header #logo-img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 /* =================================
