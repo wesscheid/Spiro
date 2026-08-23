@@ -10,9 +10,9 @@ class ParameterManager {
       // Shape
       "curveType", "dualCurveMode", "secondaryCurve", "dualModeType",
       "outerRadius", "innerRadius", "centerSize", "numPoints", "scale",
-      "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers",
+      "numLayers", "layerOffsetMode", "layerOffsetAmount", "reverseLayers", "mirrorSymmetry",
       // Style
-      "animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread", "colorMode",
+      "animSpeed", "trailLength", "lineWeight", "lineThinning", "baseHue", "colorSpread", "colorMode", "glowEffect", "blendMode",
       // Advanced
       "showOrrery", "m", "n1", "n2", "n3", "f1", "f2", "d1", "d2",
       // Auto-play
@@ -75,6 +75,10 @@ class ParameterManager {
     });
     this.updateValueDisplays();
     this.updateParameterVisibility(this.state.curveType, this.state.secondaryCurve);
+    const autoPlaySlider = document.getElementById("autoPlay-slider-container");
+    if (autoPlaySlider) {
+      autoPlaySlider.style.display = this.state.autoPlay ? "block" : "none";
+    }
   }
   
   /**
@@ -154,5 +158,38 @@ class ParameterManager {
         controls[key].style.display = "none";
       }
     });
+  }
+
+  /**
+   * Serializes the current parameter state to a URL hash string.
+   */
+  toUrlHash() {
+    const compact = {};
+    this.paramIds.forEach(id => {
+      if (this.state[id] !== undefined && this.state[id] !== null) {
+        compact[id] = this.state[id];
+      }
+    });
+    return '#' + encodeURIComponent(btoa(JSON.stringify(compact)));
+  }
+
+  /**
+   * Deserializes and loads parameters from a URL hash string.
+   */
+  fromUrlHash(hashStr) {
+    if (!hashStr || hashStr.length <= 1) return false;
+    try {
+      const raw = hashStr.startsWith('#') ? hashStr.slice(1) : hashStr;
+      const jsonStr = atob(decodeURIComponent(raw));
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && typeof parsed === 'object') {
+        Object.assign(this.state, parsed);
+        this.updateUIFromState();
+        return true;
+      }
+    } catch (e) {
+      console.warn("Failed to parse URL hash preset:", e);
+    }
+    return false;
   }
 }

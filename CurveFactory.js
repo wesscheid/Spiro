@@ -51,13 +51,17 @@ const CurveFactory = {
         return { x, y };
     },
     cycloid: (t, { inner }) => {
-        const x = inner * (t - Math.sin(t));
-        const y = inner * (1 - Math.cos(t));
+        const period = Math.PI * 2;
+        const normT = ((t % period) + period) % period - Math.PI;
+        const x = inner * (normT - Math.sin(normT));
+        const y = inner * (1 - Math.cos(normT)) - inner;
         return { x, y };
     },
     trochoid: (t, { inner, center }) => {
-        const x = inner * t - center * Math.sin(t);
-        const y = inner - center * Math.cos(t);
+        const period = Math.PI * 2;
+        const normT = ((t % period) + period) % period - Math.PI;
+        const x = inner * normT - center * Math.sin(normT);
+        const y = -center * Math.cos(normT);
         return { x, y };
     },
     limacon: (t, { outer, inner }) => {

@@ -14,7 +14,10 @@ let autoPlayCountdown = 0;
 let listenerController = new AbortController();
 let capturer = null;
 let isRecording = false;
+let isPaused = false;
 let logoImage;
+let nextTheme = null;
+let currentThemeName = "Default";
 
 class SpiroRenderer {
     constructor(parameterManager) {
@@ -33,9 +36,9 @@ class SpiroRenderer {
         this.spirographs.forEach(layer => {
             if (Array.isArray(layer)) {
                 layer.forEach(buffer => {
-                    if (buffer && buffer.points) {
-                        buffer.points = [];
+                    if (buffer) {
                         buffer.head = 0;
+                        buffer.count = 0;
                     }
                 });
                 layer.length = 0;
@@ -53,9 +56,28 @@ class SpiroRenderer {
         scale(state.scale);
         let drift = radians(0.01 * frameCount);
 
+        // Blend mode
+        if (state.blendMode) {
+            drawingContext.globalCompositeOperation = state.blendMode;
+        } else {
+            drawingContext.globalCompositeOperation = 'source-over';
+        }
+
+        // Glow / Neon effect
+        if (state.glowEffect) {
+            drawingContext.shadowBlur = 14;
+            drawingContext.shadowColor = `hsla(${state.baseHue}, 100%, 65%, 0.85)`;
+        } else {
+            drawingContext.shadowBlur = 0;
+            drawingContext.shadowColor = 'transparent';
+        }
+
         for (let i = 0; i < state.numPoints; i++) {
             push();
             rotate((i * TWO_PI) / state.numPoints + drift);
+            if (state.mirrorSymmetry && i % 2 === 1) {
+                scale(1, -1);
+            }
             for (let l = 0; l < state.numLayers; l++) {
                 this._drawCurve(i, l);
             }
@@ -63,7 +85,14 @@ class SpiroRenderer {
         }
         pop();
 
-        this.theta += state.animSpeed;
+        // Reset composite & shadow for HUD overlays
+        drawingContext.shadowBlur = 0;
+        drawingContext.shadowColor = 'transparent';
+        drawingContext.globalCompositeOperation = 'source-over';
+
+        if (!isPaused) {
+            this.theta += state.animSpeed;
+        }
     }
 
     _drawCurve(index, layer) {
@@ -100,42 +129,43 @@ class SpiroRenderer {
 
         if (!this.spirographs[index]) this.spirographs[index] = [];
         if (!this.spirographs[index][layer]) {
-            // Create a buffer with the maximum possible size ONCE.
+            // Pre-allocate typed arrays to eliminate GC pressure
             this.spirographs[index][layer] = {
-                points: new Array(400),
+                x: new Float32Array(400),
+                y: new Float32Array(400),
                 head: 0,
+                count: 0
             };
         }
 
         const buffer = this.spirographs[index][layer];
         
-        // Write the new point to the physical buffer.
-        buffer.points[buffer.head] = { x, y };
+        // Write the new point directly to typed buffers (0 object allocation)
+        buffer.x[buffer.head] = x;
+        buffer.y[buffer.head] = y;
         buffer.head = (buffer.head + 1) % 400;
+        if (buffer.count < 400) buffer.count++;
 
-        const numToDraw = Math.floor(state.trailLength);
+        const numToDraw = Math.min(buffer.count, Math.floor(state.trailLength));
 
         if (numToDraw > 1) {
             let currentHue = state.baseHue;
-            let currentSaturation = 70; // Keeping these fixed for now as per original
-            let currentBrightness = 95; // Keeping these fixed for now as per original
-            let currentAlpha = 85;    // Keeping these fixed for now as per original
+            let currentSaturation = 70;
+            let currentBrightness = 95;
+            let currentAlpha = 85;
 
             switch (state.colorMode) {
                 case "byPoint":
-                    // High contrast: Step by spread + fixed offset instead of distributing spread
                     currentHue = (state.baseHue + (index * (state.colorSpread + 45))) % 360;
                     stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
                     noFill();
                     break;
                 case "byLayer":
-                    // High contrast: Step by spread + large offset (135deg) for distinct bands
                     currentHue = (state.baseHue + (layer * (state.colorSpread + 135))) % 360;
                     stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
                     noFill();
                     break;
                 case "gradient":
-                    // Stroke will be set per segment within the loop
                     noFill();
                     break;
                 case "mono":
@@ -157,20 +187,20 @@ class SpiroRenderer {
                 const p1_idx = (buffer.head - 1 - j + 400) % 400;
                 const p2_idx = (buffer.head - 2 - j + 400) % 400;
                 
-                const p1 = buffer.points[p1_idx];
-                const p2 = buffer.points[p2_idx];
+                const x1 = buffer.x[p1_idx];
+                const y1 = buffer.y[p1_idx];
+                const x2 = buffer.x[p2_idx];
+                const y2 = buffer.y[p2_idx];
 
-                if (p1 && p2) {
-                    const progress = (numToDraw - 1 - j) / (numToDraw - 1);
-                    const weight = lerp(minWeight, state.lineWeight, progress);
-                    strokeWeight(weight);
+                const progress = (numToDraw - 1 - j) / (numToDraw - 1);
+                const weight = lerp(minWeight, state.lineWeight, progress);
+                strokeWeight(weight);
 
-                    if (state.colorMode === "gradient") {
-                        currentHue = (state.baseHue + (progress * state.colorSpread)) % 360;
-                        stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
-                    }
-                    line(p1.x, p1.y, p2.x, p2.y);
+                if (state.colorMode === "gradient") {
+                    currentHue = (state.baseHue + (progress * state.colorSpread)) % 360;
+                    stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
                 }
+                line(x1, y1, x2, y2);
             }
         }
     }
@@ -436,6 +466,16 @@ function setup() {
   signature = new ArtistSignature();
   setupEventListeners();
 
+  // Check if URL contains shared preset hash
+  if (window.location.hash) {
+    if (parameterManager.fromUrlHash(window.location.hash)) {
+      currentThemeName = "Shared Link";
+      const themeSelect = document.getElementById("themeSelect");
+      if (themeSelect) themeSelect.value = "Custom";
+      showToast("Loaded preset from shared link! 🌀");
+    }
+  }
+
   // Initialize themes array if themes.js hasn't loaded yet
   if (!window.themes) {
     window.themes = [];
@@ -491,10 +531,6 @@ function applyComplexity() {
     const { state } = parameterManager;
     if (state.complexity === undefined) return;
 
-    // This function is only called when a control is manually changed.
-    // We check if the 'complexity' slider was the one changed. If not, we don't apply the logic.
-    // A simple way to do this is to have a flag, but for now we will apply it on any change.
-    
     const complexity = pow(state.complexity, 2);
 
     // Map complexity to numPoints (e.g., from 1 to 36)
@@ -517,14 +553,63 @@ function setupEventListeners() {
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
   document.getElementById("randomizeParams")?.addEventListener("click", randomizeParameters, options);
-  document.getElementById("savePreset")?.addEventListener("click", savePreset, options);
+  document.getElementById("savePreset")?.addEventListener("click", openSavePresetModal, options);
+  document.getElementById("cancelSavePreset")?.addEventListener("click", closeSavePresetModal, options);
+  document.getElementById("confirmSavePreset")?.addEventListener("click", handleConfirmSavePreset, options);
   document.getElementById("reloadThemes")?.addEventListener("click", reloadThemes, options);
   document.getElementById("exportThemes")?.addEventListener("click", exportAllThemes, options);
   document.getElementById("saveImageBtn")?.addEventListener("click", saveImage, options);
+  document.getElementById("exportSvgBtn")?.addEventListener("click", exportSVG, options);
+  document.getElementById("shareUrlBtn")?.addEventListener("click", shareUrl, options);
   document.getElementById("captureVideoBtn")?.addEventListener("click", toggleRecording, options);
   document.getElementById("autoScaleBtn")?.addEventListener("click", () => {
     autoAdjustScale();
     renderer.reset();
+  }, options);
+
+  // Close modal when clicking on backdrop
+  document.getElementById("save-theme-modal")?.addEventListener("click", (e) => {
+    if (e.target.id === "save-theme-modal") {
+      closeSavePresetModal();
+    }
+  }, options);
+
+  // Global Keyboard Shortcuts
+  window.addEventListener("keydown", (e) => {
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+
+    switch (e.code) {
+      case "Space":
+        e.preventDefault();
+        isPaused = !isPaused;
+        showToast(isPaused ? "Paused ⏸️" : "Resumed ▶️");
+        break;
+      case "KeyR":
+        randomizeParameters();
+        showToast("Randomized 🎲");
+        break;
+      case "KeyS":
+        saveImage();
+        showToast("Saved PNG 🖼️");
+        break;
+      case "KeyE":
+        exportSVG();
+        break;
+      case "KeyF":
+        toggleFullscreenCanvas();
+        break;
+      case "KeyM":
+        const orreryEl = document.getElementById("showOrrery");
+        if (orreryEl) {
+          orreryEl.checked = !orreryEl.checked;
+          parameterManager.updateStateFromUI();
+        }
+        break;
+      case "KeyC":
+        renderer.reset();
+        showToast("Canvas Cleared 🧹");
+        break;
+    }
   }, options);
 
   const themeSelect = document.getElementById("themeSelect");
@@ -555,6 +640,7 @@ function setupEventListeners() {
         'layerOffsetMode', 
         'layerOffsetAmount', 
         'reverseLayers',
+        'mirrorSymmetry',
         'm', 'n1', 'n2', 'n3',
         'f1', 'f2', 'd1', 'd2'
       ];
@@ -575,8 +661,6 @@ function windowResized() {
     renderer.clear();
   }, 100);
 }
-
-
 
 function draw() {
   // Handle theme transition fade
@@ -605,12 +689,16 @@ function draw() {
         layerOffsetMode: choice.offset || "radius",
         layerOffsetAmount: choice.offsetAmount ?? 0.06,
         reverseLayers: !!choice.reverse,
+        mirrorSymmetry: !!choice.mirrorSymmetry,
         animSpeed: choice.speed ?? 0.02,
         trailLength: choice.trail ?? 120,
         lineWeight: choice.lineWeight ?? 1.6,
         lineThinning: choice.lineThinning ?? 0.7,
         baseHue: choice.hue ?? 260,
         colorSpread: choice.spread ?? 120,
+        colorMode: choice.colorMode || "byPoint",
+        glowEffect: !!choice.glowEffect,
+        blendMode: choice.blendMode || "source-over",
         m: choice.m, n1: choice.n1, n2: choice.n2, n3: choice.n3,
         f1: choice.f1, f2: choice.f2, d1: choice.d1, d2: choice.d2,
       };
@@ -778,51 +866,55 @@ function updateCountdown() {
 
 
 
-function autoAdjustScale() {
-  let maxRadius = 0;
-  const { curveType, outerRadius, innerRadius, centerSize } = parameterManager.state;
-
-  if (curveType === "hypotrochoid") {
-    maxRadius = outerRadius - innerRadius + centerSize;
-  } else if (curveType === "epitrochoid") {
-    maxRadius = outerRadius + innerRadius + centerSize;
-  } else if (curveType === "rose") {
-    maxRadius = outerRadius;
-  } else if (curveType === "lissajous") {
-    maxRadius = max(outerRadius, innerRadius);
-  } else if (curveType === "superformula") {
-    maxRadius = outerRadius;
-  } else if (curveType === "harmonograph") {
-    maxRadius = outerRadius * 0.5 + innerRadius * 0.5;
-  } else if (curveType === "hypocycloid") {
-    maxRadius = outerRadius;
-  } else if (curveType === "epicycloid") {
-    maxRadius = outerRadius + 2 * innerRadius;
-  } else if (curveType === "cycloid") {
-    maxRadius = 2 * innerRadius;
-  } else if (curveType === "trochoid") {
-    maxRadius = innerRadius + centerSize;
-  } else if (curveType === "limacon") {
-    maxRadius = outerRadius + innerRadius;
-  } else if (curveType === "ellipse") {
-    maxRadius = max(outerRadius, innerRadius);
-  } else if (curveType === "butterfly") {
-    maxRadius = outerRadius;
-  } else if (curveType === "astroid") {
-    maxRadius = outerRadius;
-  } else if (curveType === "bicorn") {
-    maxRadius = outerRadius;
-  } else if (curveType === "freeth's nephroid") {
-    maxRadius = outerRadius + innerRadius;
-  } else if (curveType === "cardioid") {
-    maxRadius = outerRadius;
+function getCurveBound(type, outer, inner, center) {
+  switch (type) {
+    case "hypotrochoid": return Math.abs(outer - inner) + (center || 0);
+    case "epitrochoid": return (outer + inner) + (center || 0);
+    case "rose": return outer;
+    case "lissajous": return Math.max(outer, inner);
+    case "superformula": return outer;
+    case "harmonograph": return outer * 0.5 + inner * 0.5;
+    case "hypocycloid": return outer;
+    case "epicycloid": return outer + 2 * inner;
+    case "cycloid": return Math.PI * inner;
+    case "trochoid": return Math.PI * inner + (center || 0);
+    case "limacon": return outer + inner;
+    case "ellipse": return Math.max(outer, inner);
+    case "butterfly": return outer * 1.2;
+    case "astroid": return outer;
+    case "bicorn": return outer;
+    case "freeth's nephroid": return outer + inner;
+    case "cardioid": return outer;
+    default: return outer || 180;
   }
+}
+
+function autoAdjustScale() {
+  const { state } = parameterManager;
+  let maxRadius = getCurveBound(state.curveType, state.outerRadius, state.innerRadius, state.centerSize);
+
+  if (state.dualCurveMode) {
+    const secBound = getCurveBound(state.secondaryCurve, state.outerRadius * 0.8, state.innerRadius * 0.8, state.centerSize * 0.8);
+    if (state.dualModeType === "combine") {
+      maxRadius += secBound;
+    } else {
+      maxRadius = Math.max(maxRadius, secBound);
+    }
+  }
+
+  if (state.layerOffsetMode === "radius" && state.numLayers > 1) {
+    maxRadius *= 1 + (state.numLayers - 1) * state.layerOffsetAmount;
+  }
+
+  // Account for dynamic oscillations
+  maxRadius += 35;
 
   if (maxRadius > 0) {
     const maxAllowedRadius = min(width, height) / 2;
-    const newScale = (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING;
+    const newScale = Math.max(0.1, Math.min(2.0, (maxAllowedRadius / maxRadius) * AUTOSCALE_PADDING));
     parameterManager.state.scale = newScale;
-    document.getElementById("scale").value = newScale;
+    const scaleInput = document.getElementById("scale");
+    if (scaleInput) scaleInput.value = newScale;
     const display = document.getElementById("scale-value");
     if (display) {
       display.textContent = newScale.toFixed(2);
@@ -941,15 +1033,47 @@ function applyTheme(themeName) {
   }
 }
 
-async function savePreset() {
-  const name = prompt("Enter a name for your preset:");
-  if (!name) return;
-  
-  const saveType = confirm(
-    "OK = Save for everyone to see (Community)\n" +
-    "Cancel = Save locally only (Just for you)"
-  );
-  
+function showToast(message) {
+  const toast = document.getElementById("toast-notification");
+  if (toast) {
+    toast.textContent = message;
+    toast.classList.add("show");
+    setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2600);
+  }
+}
+
+function openSavePresetModal() {
+  const modal = document.getElementById("save-theme-modal");
+  const nameInput = document.getElementById("presetNameInput");
+  if (modal) {
+    modal.classList.add("active");
+    if (nameInput) {
+      nameInput.value = "";
+      nameInput.focus();
+    }
+  }
+}
+
+function closeSavePresetModal() {
+  const modal = document.getElementById("save-theme-modal");
+  if (modal) modal.classList.remove("active");
+}
+
+async function handleConfirmSavePreset() {
+  const nameInput = document.getElementById("presetNameInput");
+  const name = nameInput ? nameInput.value.trim() : "";
+  if (!name) {
+    alert("Please enter a preset name.");
+    return;
+  }
+
+  const saveLocRadio = document.querySelector('input[name="saveLocation"]:checked');
+  const isCommunity = saveLocRadio ? saveLocRadio.value === "community" : false;
+
+  closeSavePresetModal();
+
   const newPreset = {
     name: name,
     curveType: parameterManager.state.curveType,
@@ -965,12 +1089,16 @@ async function savePreset() {
     offset: parameterManager.state.layerOffsetMode,
     offsetAmount: parameterManager.state.layerOffsetAmount,
     reverse: parameterManager.state.reverseLayers,
+    mirrorSymmetry: parameterManager.state.mirrorSymmetry,
     speed: parameterManager.state.animSpeed,
     trail: parameterManager.state.trailLength,
     lineWeight: parameterManager.state.lineWeight,
     lineThinning: parameterManager.state.lineThinning,
-    hue: parameterManager.state.baseHue,
-    spread: parameterManager.state.colorSpread,
+    baseHue: parameterManager.state.baseHue,
+    colorSpread: parameterManager.state.colorSpread,
+    colorMode: parameterManager.state.colorMode,
+    glowEffect: parameterManager.state.glowEffect,
+    blendMode: parameterManager.state.blendMode,
     m: parameterManager.state.m,
     n1: parameterManager.state.n1,
     n2: parameterManager.state.n2,
@@ -981,53 +1109,157 @@ async function savePreset() {
     d2: parameterManager.state.d2,
     createdAt: new Date().toISOString()
   };
-  
-  if (saveType) {
+
+  if (isCommunity) {
     // Save to Firebase (community)
     try {
-      const { collection, addDoc } = window.firebaseFunctions; // Use globally exposed functions
-      
+      const { collection, addDoc } = window.firebaseFunctions;
       const docRef = await addDoc(collection(window.firestore, "themes"), newPreset);
       newPreset.id = docRef.id;
       newPreset.isCommunity = true;
-      
+
       window.themes.push(newPreset);
       populateThemes();
-      
+
       const themeSelect = document.getElementById("themeSelect");
       if (themeSelect) {
         themeSelect.value = name;
       }
-      
-      alert(`Preset '${name}' saved and shared with the community! 🎉`);
-      console.log("Community preset saved:", newPreset);
+
+      showToast(`'${name}' shared with community! 🌐🎉`);
     } catch (err) {
       console.error("Failed to save to Firebase:", err);
-      alert("Failed to save community preset. Try saving locally instead.");
+      showToast("Failed to save to community. Saving locally.");
+      savePresetLocally(newPreset);
     }
   } else {
-    // Save locally only
-    newPreset.isBuiltIn = false;
-    
-    try {
-      const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
-      localThemes.push(newPreset);
-      localStorage.setItem("spiro_custom_themes", JSON.stringify(localThemes));
-      
-      window.themes.push(newPreset);
-      populateThemes();
-      
-      const themeSelect = document.getElementById("themeSelect");
-      if (themeSelect) {
-        themeSelect.value = name;
-      }
-      
-      alert(`Preset '${name}' saved locally!`);
-      console.log("Local preset saved:", newPreset);
-    } catch (err) {
-      console.error("Failed to save locally:", err);
-      alert("Failed to save preset.");
+    savePresetLocally(newPreset);
+  }
+}
+
+function savePresetLocally(newPreset) {
+  newPreset.isBuiltIn = false;
+  try {
+    const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
+    localThemes.push(newPreset);
+    localStorage.setItem("spiro_custom_themes", JSON.stringify(localThemes));
+
+    window.themes.push(newPreset);
+    populateThemes();
+
+    const themeSelect = document.getElementById("themeSelect");
+    if (themeSelect) {
+      themeSelect.value = newPreset.name;
     }
+
+    showToast(`Preset '${newPreset.name}' saved locally! 💾`);
+  } catch (err) {
+    console.error("Failed to save locally:", err);
+    showToast("Failed to save preset locally.");
+  }
+}
+
+function exportSVG() {
+  const { state } = parameterManager;
+  if (!state || !renderer) return;
+
+  const w = width;
+  const h = height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const s = state.scale;
+  let drift = radians(0.01 * frameCount);
+
+  let svgContent = `<?xml version="1.0" standalone="no"?>\n`;
+  svgContent += `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" version="1.1">\n`;
+  svgContent += `  <rect width="100%" height="100%" fill="#11141c"/>\n`;
+  svgContent += `  <g fill="none" stroke-linecap="round" stroke-linejoin="round">\n`;
+
+  for (let i = 0; i < state.numPoints; i++) {
+    const angle = (i * TWO_PI) / state.numPoints + drift;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const mirrorY = (state.mirrorSymmetry && i % 2 === 1) ? -1 : 1;
+
+    for (let l = 0; l < state.numLayers; l++) {
+      const buffer = renderer.spirographs[i]?.[l];
+      if (!buffer || buffer.count <= 1) continue;
+
+      const numToDraw = Math.min(buffer.count, Math.floor(state.trailLength));
+      const minWeight = state.lineWeight * (1 - state.lineThinning);
+
+      let currentHue = state.baseHue;
+      switch (state.colorMode) {
+        case "byPoint":
+          currentHue = (state.baseHue + (i * (state.colorSpread + 45))) % 360;
+          break;
+        case "byLayer":
+          currentHue = (state.baseHue + (l * (state.colorSpread + 135))) % 360;
+          break;
+        case "mono":
+          currentHue = state.baseHue;
+          break;
+        case "rainbow":
+          currentHue = (state.baseHue + (i * state.colorSpread / state.numPoints) + l * 40) % 360;
+          break;
+      }
+
+      for (let j = 0; j < numToDraw - 1; j++) {
+        const p1_idx = (buffer.head - 1 - j + 400) % 400;
+        const p2_idx = (buffer.head - 2 - j + 400) % 400;
+        const lx1 = buffer.x[p1_idx];
+        const ly1 = buffer.y[p1_idx] * mirrorY;
+        const lx2 = buffer.x[p2_idx];
+        const ly2 = buffer.y[p2_idx] * mirrorY;
+
+        const gx1 = cx + (lx1 * cosA - ly1 * sinA) * s;
+        const gy1 = cy + (lx1 * sinA + ly1 * cosA) * s;
+        const gx2 = cx + (lx2 * cosA - ly2 * sinA) * s;
+        const gy2 = cy + (lx2 * sinA + ly2 * cosA) * s;
+
+        const progress = (numToDraw - 1 - j) / (numToDraw - 1);
+        const weight = Math.max(0.2, (minWeight + (state.lineWeight - minWeight) * progress) * s);
+
+        if (state.colorMode === "gradient") {
+          currentHue = (state.baseHue + (progress * state.colorSpread)) % 360;
+        }
+
+        const bri = 95, sat = 70;
+        const lum = (bri * (1 - sat / 200)).toFixed(1);
+        const satL = (bri === 0 || bri === 100) ? 0 : (((bri - lum) / Math.min(lum, 100 - lum)) * 100).toFixed(1);
+        const strokeColor = `hsla(${Math.round(currentHue)}, ${satL}%, ${lum}%, 0.85)`;
+
+        svgContent += `    <line x1="${gx1.toFixed(2)}" y1="${gy1.toFixed(2)}" x2="${gx2.toFixed(2)}" y2="${gy2.toFixed(2)}" stroke="${strokeColor}" stroke-width="${weight.toFixed(2)}"/>\n`;
+      }
+    }
+  }
+
+  svgContent += `  </g>\n</svg>`;
+
+  const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const downloadLink = document.createElement("a");
+  const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+  downloadLink.href = url;
+  downloadLink.download = `spiralmuse_${timestamp}.svg`;
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+  URL.revokeObjectURL(url);
+  showToast("SVG Vector Exported! 📐");
+}
+
+function shareUrl() {
+  const hash = parameterManager.toUrlHash();
+  const shareableUrl = window.location.origin + window.location.pathname + hash;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareableUrl).then(() => {
+      showToast("Preset link copied to clipboard! 🔗");
+    }).catch(() => {
+      prompt("Copy this preset URL:", shareableUrl);
+    });
+  } else {
+    prompt("Copy this preset URL:", shareableUrl);
   }
 }
 
@@ -1075,9 +1307,6 @@ function exportAllThemes() {
   downloadAnchorNode.click();
   downloadAnchorNode.remove();
 }
-
-let nextTheme = null;
-let currentThemeName = "";
 
 function shuffleTheme() {
   if (!Array.isArray(window.themes) || window.themes.length === 0) return;
@@ -1132,5 +1361,5 @@ document.addEventListener("fullscreenchange", () => {
   }
   const { w, h } = getCanvasSize();
   resizeCanvas(w, h);
-  clearSpirographs();
+  renderer?.clear();
 });

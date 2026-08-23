@@ -119,6 +119,9 @@
           <div class="control-group">
             <label><input type="checkbox" id="reverseLayers"> Reverse Alternate Layers</label>
           </div>
+          <div class="control-group">
+            <label><input type="checkbox" id="mirrorSymmetry"> Mirror Symmetry (Mandala)</label>
+          </div>
         </div>
       </div>
       
@@ -140,6 +143,18 @@
               <option value="rose">Rose Curve</option>
               <option value="lissajous">Lissajous</option>
               <option value="superformula">Superformula</option>
+              <option value="harmonograph">Harmonograph</option>
+              <option value="hypocycloid">Hypocycloid</option>
+              <option value="epicycloid">Epicycloid</option>
+              <option value="cycloid">Cycloid</option>
+              <option value="trochoid">Trochoid</option>
+              <option value="limacon">Limacon</option>
+              <option value="ellipse">Ellipse</option>
+              <option value="butterfly">Butterfly</option>
+              <option value="astroid">Astroid</option>
+              <option value="bicorn">Bicorn</option>
+              <option value="freeth's nephroid">Freeth's Nephroid</option>
+              <option value="cardioid">Cardioid</option>
             </select>
           </div>
           <div class="control-group">
@@ -178,13 +193,26 @@
               <option value="rainbow">Rainbow (Classic)</option>
             </select>
           </div>
-           <div class="control-group">
+          <div class="control-group">
             <label for="lineWeight">Line Weight <span id="lineWeight-value" class="value-display"></span></label>
             <input id="lineWeight" type="range" min="0.1" max="6" step="0.1" value="1.6">
           </div>
           <div class="control-group">
             <label for="lineThinning">Line Thinning <span id="lineThinning-value" class="value-display"></span></label>
             <input id="lineThinning" type="range" min="0" max="1" step="0.01" value="0.7">
+          </div>
+          <div class="control-group">
+            <label><input type="checkbox" id="glowEffect"> Glow / Neon Bloom</label>
+          </div>
+          <div class="control-group">
+            <label for="blendMode">Blend Mode</label>
+            <select id="blendMode">
+              <option value="source-over">Normal</option>
+              <option value="lighter">Additive (Neon Glow)</option>
+              <option value="screen">Screen</option>
+              <option value="multiply">Multiply</option>
+              <option value="difference">Difference</option>
+            </select>
           </div>
         </div>
       </div>
@@ -212,8 +240,12 @@
             <button id="autoScaleBtn">Auto Scale</button>
           </div>
           <hr style="border-color: #2a2a2a; margin: 20px 0;">
+          <div class="control-group btn-row">
+            <button id="saveImageBtn">Save PNG</button>
+            <button id="exportSvgBtn">Export SVG</button>
+          </div>
           <div class="control-group">
-            <button id="saveImageBtn">Save Image</button>
+            <button id="shareUrlBtn">Share Preset Link</button>
           </div>
           <div class="control-group">
             <button id="captureVideoBtn">Capture Video</button>
@@ -238,6 +270,11 @@
           </div>
           <div class="control-group">
             <label><input type="checkbox" id="autoPlay"> Auto Randomize</label>
+          </div>
+          <div class="control-group" id="autoPlay-slider-container" style="display: none;">
+            <label for="autoPlayInterval">Interval (s) <span id="autoPlayInterval-value" class="value-display">5</span></label>
+            <input id="autoPlayInterval" type="range" min="2" max="30" step="1" value="5">
+            <small style="color: var(--text-secondary-color); font-size: 11px; margin-top: 4px; display: block;">Next change in: <span id="autoPlayCountdown">--</span>s</small>
           </div>
            <div class="control-group">
             <button id="reloadThemes">Reload Themes.js</button>
@@ -325,5 +362,29 @@
       addDoc
     };
   </script>
+  <!-- Save Theme Modal -->
+  <div id="save-theme-modal" class="modal-overlay">
+    <div class="modal-card">
+      <h3>Save as Preset</h3>
+      <input type="text" id="presetNameInput" placeholder="Enter preset name..." maxlength="32">
+      <div class="modal-radio-group">
+        <label>
+          <input type="radio" name="saveLocation" value="community" checked>
+          <span>Share with Community 🌐</span>
+        </label>
+        <label>
+          <input type="radio" name="saveLocation" value="local">
+          <span>Save Locally Only 💾</span>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelSavePreset" class="btn-secondary">Cancel</button>
+        <button id="confirmSavePreset" class="primary">Save Preset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-notification">Link copied to clipboard!</div>
 </body>
 </html>
