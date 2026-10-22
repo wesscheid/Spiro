@@ -1,12 +1,9 @@
 let parameterManager;
-let spirographs = [];
-let theta = 0;
 let renderer;
 let orrery;
 let signature;
 let fullscreenMode = false;
 let canvasEl = null;
-let themeTransition = null;
 let fadeState = "none";
 let fadeAlpha = 0;
 let autoPlayTimer = null;
@@ -501,6 +498,10 @@ function toggleRecording() {
   const videoLength = document.getElementById('videoLength').value;
   if (!isRecording) {
     // Start recording
+    if (typeof CCapture === "undefined") {
+      showToast("Video capture unavailable - recorder library failed to load.");
+      return;
+    }
     capturer = new CCapture({
       format: 'webm',
       framerate: 60,
@@ -621,7 +622,7 @@ function setupEventListeners() {
   
   // The ParameterManager now handles binding all UI controls in the panel.
   parameterManager.bindUI((changedId) => {
-      if (changedId === 'complexity' || changedId === 'outerRadius') {
+      if (changedId === 'complexity') {
         applyComplexity();
       }
 
@@ -708,6 +709,7 @@ function draw() {
               parameterManager.state[key] = value;
           }
       }
+      parameterManager.sanitizeState();
 
       parameterManager.updateUIFromState();
       fadeState = "fading-in";
@@ -922,6 +924,13 @@ function autoAdjustScale() {
   }
 }
 
+function validThemeEntries(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(t => t && typeof t === "object" && typeof t.name === "string" && t.name.trim().length > 0)
+    .map(t => ({ ...t, name: t.name.slice(0, 64) }));
+}
+
 async function loadCustomThemes() {
   // Wait for Firestore to be ready (with timeout)
   let attempts = 0;
@@ -934,7 +943,7 @@ async function loadCustomThemes() {
     console.warn("Firestore not ready, loading local themes only");
     try {
       const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
-      window.themes = [...window.themes, ...localThemes];
+      window.themes = [...window.themes, ...validThemeEntries(localThemes)];
     } catch (e) {
       console.warn("Failed to load local themes:", e);
     }
@@ -961,25 +970,16 @@ async function loadCustomThemes() {
     const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
     
     // Combine built-in, local, and community themes
-    window.themes = [...window.themes, ...localThemes, ...communityThemes];
+    window.themes = [...window.themes, ...validThemeEntries(localThemes), ...validThemeEntries(communityThemes)];
   } catch (err) {
     console.warn("Failed to load community themes:", err);
     // Fallback to local themes only
     try {
       const localThemes = JSON.parse(localStorage.getItem("spiro_custom_themes") || "[]");
-      window.themes = [...window.themes, ...localThemes];
+      window.themes = [...window.themes, ...validThemeEntries(localThemes)];
     } catch (e) {
       console.warn("Failed to load local themes:", e);
     }
-  }
-}
-
-function saveCustomThemes() {
-  try {
-    const customThemes = window.themes.filter(theme => !theme.isBuiltIn && !theme.isCommunity);
-    localStorage.setItem("spiro_custom_themes", JSON.stringify(customThemes));
-  } catch (err) {
-    console.warn("Failed to save custom themes:", err);
   }
 }
 
