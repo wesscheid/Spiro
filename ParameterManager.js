@@ -161,6 +161,87 @@ class ParameterManager {
   }
 
   /**
+   * Validates the internal state in place: drops unknown keys, coerces
+   * numeric values and clamps them to the control ranges, resets invalid
+   * enum values to safe defaults, and coerces booleans. Anything that
+   * enters state from outside the UI (URL hashes, saved themes, community
+   * themes from Firestore) must pass through here — unvalidated values
+   * can otherwise produce NaN geometry (e.g. innerRadius 0 divides by
+   * zero in several curve formulas) and a silently blank canvas.
+   */
+  sanitizeState() {
+    const numericRanges = {
+      complexity: [0, 1], outerRadius: [20, 400], innerRadius: [5, 300],
+      centerSize: [0, 300], numPoints: [1, 48], numLayers: [1, 16],
+      layerOffsetAmount: [0, 1], animSpeed: [0, 0.1], trailLength: [10, 400],
+      lineWeight: [0.1, 6], lineThinning: [0, 1], baseHue: [0, 360],
+      colorSpread: [0, 360], scale: [0.1, 2], autoPlayInterval: [2, 30],
+      m: [0, 20], n1: [0.1, 10], n2: [0.1, 10], n3: [0.1, 10],
+      f1: [0, 10], f2: [0, 10], d1: [0, 0.1], d2: [0, 0.1]
+    };
+    const numericDefaults = {
+      complexity: 0.5, outerRadius: 180, innerRadius: 80, centerSize: 60,
+      numPoints: 12, numLayers: 2, layerOffsetAmount: 0.06, animSpeed: 0.04,
+      trailLength: 50, lineWeight: 1.6, lineThinning: 0.7, baseHue: 260,
+      colorSpread: 120, scale: 1, autoPlayInterval: 5,
+      m: 6, n1: 0.3, n2: 1.7, n3: 1.7, f1: 2, f2: 3, d1: 0.0006, d2: 0.0008
+    };
+    const integerKeys = new Set([
+      "outerRadius", "innerRadius", "centerSize", "numPoints", "numLayers",
+      "trailLength", "baseHue", "colorSpread", "autoPlayInterval"
+    ]);
+    const curveNames = (typeof CurveFactory !== "undefined")
+      ? Object.keys(CurveFactory.formulas)
+      : null; // If CurveFactory failed to load, leave curve names unchecked.
+    const enums = {
+      layerOffsetMode: ["radius", "rotation", "phase"],
+      dualModeType: ["blend", "combine", "alternate"],
+      colorMode: ["byPoint", "byLayer", "gradient", "mono", "rainbow"],
+      blendMode: ["source-over", "lighter", "screen", "multiply", "difference"]
+    };
+    if (curveNames) {
+      enums.curveType = curveNames;
+      enums.secondaryCurve = curveNames;
+    }
+    const enumDefaults = {
+      curveType: "hypotrochoid", secondaryCurve: "hypotrochoid",
+      layerOffsetMode: "radius", dualModeType: "blend",
+      colorMode: "byPoint", blendMode: "source-over"
+    };
+    const booleanKeys = [
+      "dualCurveMode", "reverseLayers", "mirrorSymmetry",
+      "glowEffect", "showOrrery", "autoPlay"
+    ];
+
+    // Drop keys the UI does not own.
+    const allowed = new Set(this.paramIds);
+    Object.keys(this.state).forEach(key => {
+      if (!allowed.has(key)) delete this.state[key];
+    });
+
+    Object.entries(numericRanges).forEach(([key, [min, max]]) => {
+      if (this.state[key] === undefined) return;
+      let value = parseFloat(this.state[key]);
+      if (!Number.isFinite(value)) value = numericDefaults[key];
+      value = Math.min(max, Math.max(min, value));
+      if (integerKeys.has(key)) value = Math.round(value);
+      this.state[key] = value;
+    });
+
+    Object.entries(enums).forEach(([key, values]) => {
+      if (this.state[key] === undefined) return;
+      if (!values.includes(this.state[key])) this.state[key] = enumDefaults[key];
+    });
+
+    booleanKeys.forEach(key => {
+      if (this.state[key] === undefined) return;
+      this.state[key] = this.state[key] === true || this.state[key] === "true";
+    });
+
+    return this.state;
+  }
+
+  /**
    * Serializes the current parameter state to a URL hash string.
    */
   toUrlHash() {
@@ -184,6 +265,7 @@ class ParameterManager {
       const parsed = JSON.parse(jsonStr);
       if (parsed && typeof parsed === 'object') {
         Object.assign(this.state, parsed);
+        this.sanitizeState();
         this.updateUIFromState();
         return true;
       }
