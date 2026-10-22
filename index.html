@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Splash&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=2.2">
+  <link rel="stylesheet" href="style.css?v=2.3">
 </head>
 <body>
   <div id="canvas-container"></div>
@@ -42,6 +42,9 @@
       </div>
        <div class="control-group">
           <button id="shuffleTheme" class="primary">Shuffle Theme</button>
+       </div>
+       <div class="control-group">
+          <button id="browseThemes">Browse Theme Gallery</button>
        </div>
        <div class="control-group">
           <button id="randomizeParams">Randomize All</button>
@@ -315,10 +318,10 @@
     </div>
   </div>
 
-  <script src="themes.js?v=2.2"></script>
-  <script src="CurveFactory.js?v=2.2"></script>
-  <script src="ParameterManager.js?v=2.2"></script>
-  <script src="spiro.js?v=2.2"></script>
+  <script src="themes.js?v=2.3"></script>
+  <script src="CurveFactory.js?v=2.3"></script>
+  <script src="ParameterManager.js?v=2.3"></script>
+  <script src="spiro.js?v=2.3"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const headers = document.querySelectorAll('.details-section-header');
@@ -393,6 +396,17 @@
         <button id="cancelSavePreset" class="btn-secondary">Cancel</button>
         <button id="confirmSavePreset" class="primary">Save Preset</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Theme Gallery -->
+  <div id="theme-gallery" class="modal-overlay">
+    <div class="modal-card gallery-card">
+      <div class="gallery-header">
+        <h3>Theme Gallery</h3>
+        <button id="closeGallery" class="btn-secondary">Close</button>
+      </div>
+      <div id="galleryGrid" class="gallery-grid"></div>
     </div>
   </div>
 

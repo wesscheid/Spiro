@@ -553,6 +553,11 @@ function setupEventListeners() {
 
   document.getElementById("fullscreenToggle")?.addEventListener("click", toggleFullscreenCanvas, options);
   document.getElementById("shuffleTheme")?.addEventListener("click", shuffleTheme, options);
+  document.getElementById("browseThemes")?.addEventListener("click", openThemeGallery, options);
+  document.getElementById("closeGallery")?.addEventListener("click", closeThemeGallery, options);
+  document.getElementById("theme-gallery")?.addEventListener("click", (e) => {
+    if (e.target.id === "theme-gallery") closeThemeGallery();
+  }, options);
   document.getElementById("randomizeParams")?.addEventListener("click", randomizeParameters, options);
   document.getElementById("savePreset")?.addEventListener("click", openSavePresetModal, options);
   document.getElementById("cancelSavePreset")?.addEventListener("click", closeSavePresetModal, options);
@@ -1017,6 +1022,128 @@ function populateThemes() {
         }
     }
   }
+}
+
+/**
+ * Samples a theme primary curve into polylines (one per rotational
+ * copy) in local coordinates, for gallery thumbnails. Static
+ * approximation of the live render: animation drift, layer oscillation,
+ * glow, and dual-curve blending are not simulated.
+ * Returns { polylines, bound }; bound is the radius to fit.
+ */
+function sampleThemePolylines(theme, samples = 900) {
+  const outer = theme.outer ?? 180;
+  const inner = theme.inner ?? 80;
+  const center = theme.center ?? 60;
+  const params = {
+    outer, inner, center,
+    m: theme.m ?? 6, n1: theme.n1 ?? 0.3, n2: theme.n2 ?? 1.7, n3: theme.n3 ?? 1.7,
+    f1: theme.f1 ?? 2, f2: theme.f2 ?? 3, d1: theme.d1 ?? 0.0006, d2: theme.d2 ?? 0.0008
+  };
+  const formula = CurveFactory.getFormula(theme.curveType || "hypotrochoid");
+  const span = Math.PI * 2 * 10;
+  const base = [];
+  let bound = 0;
+  for (let i = 0; i <= samples; i++) {
+    const p = formula((i / samples) * span, params);
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    base.push(p.x, p.y);
+    const r = Math.hypot(p.x, p.y);
+    if (r > bound) bound = r;
+  }
+  if (base.length < 4 || bound === 0) return { polylines: [], bound: 0 };
+  const points = Math.max(1, Math.min(48, Math.round(theme.points ?? 12)));
+  const polylines = [];
+  for (let i = 0; i < points; i++) {
+    const a = (i * Math.PI * 2) / points;
+    const cosA = Math.cos(a), sinA = Math.sin(a);
+    const flip = (theme.mirrorSymmetry && i % 2 === 1) ? -1 : 1;
+    const line = [];
+    for (let j = 0; j < base.length; j += 2) {
+      const x = base[j], y = base[j + 1] * flip;
+      line.push(x * cosA - y * sinA, x * sinA + y * cosA);
+    }
+    polylines.push(line);
+  }
+  return { polylines, bound };
+}
+
+function drawThemeThumbnail(canvas, theme) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const size = canvas.width;
+  ctx.fillStyle = "#11141c";
+  ctx.fillRect(0, 0, size, size);
+  const { polylines, bound } = sampleThemePolylines(theme);
+  if (!polylines.length) return;
+  const hue = theme.hue ?? theme.baseHue ?? 260;
+  const scaleF = (size / 2 - 6) / bound;
+  ctx.strokeStyle = "hsla(" + hue + ", 70%, 65%, 0.9)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  polylines.forEach(line => {
+    for (let j = 0; j < line.length; j += 2) {
+      const gx = size / 2 + line[j] * scaleF;
+      const gy = size / 2 + line[j + 1] * scaleF;
+      if (j === 0) ctx.moveTo(gx, gy); else ctx.lineTo(gx, gy);
+    }
+  });
+  ctx.stroke();
+}
+
+let galleryBuiltForCount = -1;
+
+function buildThemeGallery() {
+  const grid = document.getElementById("galleryGrid");
+  if (!grid || !Array.isArray(window.themes)) return;
+  grid.innerHTML = "";
+  const cards = [];
+  window.themes.forEach(theme => {
+    const item = document.createElement("div");
+    item.className = "gallery-item";
+    const canvas = document.createElement("canvas");
+    canvas.width = 144;
+    canvas.height = 144;
+    const label = document.createElement("span");
+    label.textContent = theme.name + (theme.isCommunity ? " 🌐" : "");
+    item.appendChild(canvas);
+    item.appendChild(label);
+    item.title = theme.name;
+    item.addEventListener("click", () => {
+      const themeSelect = document.getElementById("themeSelect");
+      if (themeSelect) themeSelect.value = theme.name;
+      applyTheme(theme.name);
+      closeThemeGallery();
+    });
+    grid.appendChild(item);
+    cards.push({ canvas, theme });
+  });
+  galleryBuiltForCount = window.themes.length;
+  // Render thumbnails a few per frame so opening never blocks the UI.
+  let idx = 0;
+  const renderChunk = () => {
+    const start = performance.now();
+    while (idx < cards.length && performance.now() - start < 12) {
+      drawThemeThumbnail(cards[idx].canvas, cards[idx].theme);
+      idx++;
+    }
+    if (idx < cards.length) requestAnimationFrame(renderChunk);
+  };
+  requestAnimationFrame(renderChunk);
+}
+
+function openThemeGallery() {
+  const overlay = document.getElementById("theme-gallery");
+  if (!overlay) return;
+  if (galleryBuiltForCount !== (window.themes ? window.themes.length : 0)) {
+    buildThemeGallery();
+  }
+  overlay.classList.add("active");
+}
+
+function closeThemeGallery() {
+  const overlay = document.getElementById("theme-gallery");
+  if (overlay) overlay.classList.remove("active");
 }
 
 function applyTheme(themeName) {

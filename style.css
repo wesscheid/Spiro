@@ -411,3 +411,69 @@ input[type="checkbox"] {
     left: 15px;
   }
 }
+/* =================================
+   THEME GALLERY
+   ================================= */
+#theme-gallery .gallery-card {
+  max-width: 760px;
+  width: 92%;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.gallery-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.gallery-header button {
+  width: auto;
+  margin-top: 0;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.gallery-item {
+  cursor: pointer;
+  text-align: center;
+}
+
+.gallery-item canvas {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  background: #11141c;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: border-color 0.2s ease;
+}
+
+.gallery-item:hover canvas {
+  border-color: var(--accent-hot);
+}
+
+.gallery-item span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary-color);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
