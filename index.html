@@ -326,12 +326,17 @@
         });
       });
 
-      // Collapse some sections by default for a cleaner start
+      // Sections start collapsed in CSS. Expand all except the ones
+      // that should stay collapsed by default for a cleaner start.
       const sectionsToCollapse = ['Dual Curve', 'Advanced'];
       headers.forEach(header => {
         const title = header.querySelector('h3').textContent;
+        const content = header.nextElementSibling;
+        const toggle = header.querySelector('.details-section-toggle');
         if (sectionsToCollapse.includes(title)) {
-          header.click();
+          toggle.classList.add('collapsed');
+        } else {
+          content.classList.add('expanded');
         }
       });
     });
