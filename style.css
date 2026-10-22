@@ -50,7 +50,7 @@ body {
   overflow: hidden;
 }
 
-canvas {
+#canvas-container canvas {
   display: block;
   position: absolute;
   top: 0;
@@ -455,7 +455,9 @@ input[type="checkbox"] {
 }
 
 .gallery-item canvas {
+  position: static;
   width: 100%;
+  height: auto;
   aspect-ratio: 1 / 1;
   display: block;
   background: #11141c;
