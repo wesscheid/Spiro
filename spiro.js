@@ -2,7 +2,6 @@ let parameterManager;
 let renderer;
 let orrery;
 let signature;
-let fullscreenMode = false;
 let canvasEl = null;
 let fadeState = "none";
 let fadeAlpha = 0;
@@ -449,6 +448,7 @@ function setup() {
   const c = createCanvas(w, h);
   canvasEl = c.canvas;
   c.parent("canvas-container");
+  new ResizeObserver(syncCanvasSize).observe(canvasEl.parentElement);
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
   fadeAlpha = 0;
@@ -582,7 +582,8 @@ function setupEventListeners() {
 
   // Global Keyboard Shortcuts
   window.addEventListener("keydown", (e) => {
-    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName) ||
+        (e.code === "Space" && document.activeElement?.matches("button, summary, a[href]"))) return;
 
     switch (e.code) {
       case "Space":
@@ -659,13 +660,11 @@ function setupEventListeners() {
   });
 }
 
-function windowResized() {
-  // Small delay to allow flex layout to settle (especially on mobile rotation/bar toggle)
-  setTimeout(() => {
-    const { w, h } = getCanvasSize();
-    resizeCanvas(w, h);
-    renderer.clear();
-  }, 100);
+function syncCanvasSize() {
+  const { w, h } = getCanvasSize();
+  if (!renderer || !w || !h || (w === width && h === height)) return;
+  resizeCanvas(w, h);
+  renderer.clear();
 }
 
 function draw() {
@@ -1099,8 +1098,9 @@ function buildThemeGallery() {
   grid.innerHTML = "";
   const cards = [];
   window.themes.forEach(theme => {
-    const item = document.createElement("div");
+    const item = document.createElement("button");
     item.className = "gallery-item";
+    item.type = "button";
     const canvas = document.createElement("canvas");
     canvas.width = 144;
     canvas.height = 144;
@@ -1451,42 +1451,25 @@ function shuffleTheme() {
   fadeState = "fading-out";
 }
 
-function toggleFullscreenCanvas() {
+async function toggleFullscreenCanvas() {
   const container = document.getElementById("canvas-container");
-  const controls = document.getElementById("controls");
-  const button = document.getElementById("fullscreenToggle");
-
-  if (!document.fullscreenElement) {
-    container?.requestFullscreen().then(() => {
-      fullscreenMode = true;
-      if (controls) controls.style.display = "none";
-      if (button) button.innerHTML = "&#x2715;";
-      const { w, h } = getCanvasSize();
-      resizeCanvas(w, h);
-      renderer.clear();
-    });
-  } else {
-    document.exitFullscreen().then(() => {
-      fullscreenMode = false;
-      if (controls) controls.style.display = "block";
-      if (button) button.innerHTML = "&#x26F6;";
-      const { w, h } = getCanvasSize();
-      resizeCanvas(w, h);
-      renderer.clear();
-    });
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (container.requestFullscreen) {
+      await container.requestFullscreen();
+    } else {
+      showToast("Fullscreen is unavailable in this browser.");
+    }
+  } catch {
+    showToast("Fullscreen is unavailable.");
   }
 }
 
 document.addEventListener("fullscreenchange", () => {
-  const controls = document.getElementById("controls");
   const button = document.getElementById("fullscreenToggle");
-  fullscreenMode = !!document.fullscreenElement;
-  if (controls) controls.style.display = fullscreenMode ? "none" : "block";
-  if (button) {
-    button.style.display = "block";
-    button.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
-  }
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  renderer?.clear();
+  const isFullscreen = document.fullscreenElement === button.parentElement;
+  button.textContent = isFullscreen ? "×" : "⛶";
+  button.setAttribute("aria-label", isFullscreen ? "Exit fullscreen" : "Enter fullscreen");
+  syncCanvasSize();
 });
