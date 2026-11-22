@@ -60,7 +60,9 @@ class SpiroRenderer {
         }
 
         // Glow / Neon effect
-        if (state.glowEffect) {
+        const blendsStrokes = drawingContext.globalCompositeOperation !== "source-over";
+        const blendGlow = state.glowEffect && blendsStrokes;
+        if (state.glowEffect && !blendGlow) {
             drawingContext.shadowBlur = 14;
             drawingContext.shadowColor = `hsla(${state.baseHue}, 100%, 65%, 0.85)`;
         } else {
@@ -70,7 +72,7 @@ class SpiroRenderer {
 
         // Canvas compositing and blurred shadows make each stroke more expensive.
         // Sample the trail at render time while retaining every point in the buffer.
-        const usesEffects = state.glowEffect || drawingContext.globalCompositeOperation !== "source-over";
+        const usesEffects = state.glowEffect || blendsStrokes;
         const segmentBudget = state.glowEffect ? 240 : 480;
         const maxSegments = usesEffects
             ? Math.max(1, Math.floor(segmentBudget / (state.numPoints * state.numLayers)))
@@ -83,7 +85,7 @@ class SpiroRenderer {
                 scale(1, -1);
             }
             for (let l = 0; l < state.numLayers; l++) {
-                this._drawCurve(i, l, maxSegments);
+                this._drawCurve(i, l, maxSegments, blendGlow);
             }
             pop();
         }
@@ -99,7 +101,7 @@ class SpiroRenderer {
         }
     }
 
-    _drawCurve(index, layer, maxSegments) {
+    _drawCurve(index, layer, maxSegments, blendGlow) {
         const { state } = this.parameterManager;
         let { outerRadius, innerRadius, centerSize } = state;
         let currentTheta = this.theta;
@@ -208,6 +210,16 @@ class SpiroRenderer {
                 if (state.colorMode === "gradient") {
                     currentHue = (state.baseHue + (progress * state.colorSpread)) % 360;
                     stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
+                }
+                if (blendGlow) {
+                    // A translucent outer stroke keeps the halo without blurring
+                    // a separate shadow for every composited segment.
+                    const opacity = drawingContext.globalAlpha;
+                    drawingContext.globalAlpha = opacity * 0.16;
+                    strokeWeight(weight + 7);
+                    line(x1, y1, x2, y2);
+                    drawingContext.globalAlpha = opacity;
+                    strokeWeight(weight);
                 }
                 line(x1, y1, x2, y2);
             }
