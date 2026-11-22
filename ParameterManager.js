@@ -85,6 +85,9 @@ class ParameterManager {
    * Updates the "-value" span indicators next to range sliders.
    */
   updateValueDisplays() {
+      const hue = Number(this.state.baseHue);
+      document.documentElement.style.setProperty("--art-hue", Number.isFinite(hue) ? hue : 260);
+
       this.paramIds.forEach(id => {
           const el = this.controls[id];
           if (!el || el.type !== 'range') return;

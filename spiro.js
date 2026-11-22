@@ -2,7 +2,6 @@ let parameterManager;
 let renderer;
 let orrery;
 let signature;
-let fullscreenMode = false;
 let canvasEl = null;
 let fadeState = "none";
 let fadeAlpha = 0;
@@ -61,13 +60,23 @@ class SpiroRenderer {
         }
 
         // Glow / Neon effect
-        if (state.glowEffect) {
+        const blendsStrokes = drawingContext.globalCompositeOperation !== "source-over";
+        const blendGlow = state.glowEffect && blendsStrokes;
+        if (state.glowEffect && !blendGlow) {
             drawingContext.shadowBlur = 14;
             drawingContext.shadowColor = `hsla(${state.baseHue}, 100%, 65%, 0.85)`;
         } else {
             drawingContext.shadowBlur = 0;
             drawingContext.shadowColor = 'transparent';
         }
+
+        // Canvas compositing and blurred shadows make each stroke more expensive.
+        // Sample the trail at render time while retaining every point in the buffer.
+        const usesEffects = state.glowEffect || blendsStrokes;
+        const segmentBudget = state.glowEffect ? 240 : 480;
+        const maxSegments = usesEffects
+            ? Math.max(1, Math.floor(segmentBudget / (state.numPoints * state.numLayers)))
+            : Infinity;
 
         for (let i = 0; i < state.numPoints; i++) {
             push();
@@ -76,7 +85,7 @@ class SpiroRenderer {
                 scale(1, -1);
             }
             for (let l = 0; l < state.numLayers; l++) {
-                this._drawCurve(i, l);
+                this._drawCurve(i, l, maxSegments, blendGlow);
             }
             pop();
         }
@@ -92,7 +101,7 @@ class SpiroRenderer {
         }
     }
 
-    _drawCurve(index, layer) {
+    _drawCurve(index, layer, maxSegments, blendGlow) {
         const { state } = this.parameterManager;
         let { outerRadius, innerRadius, centerSize } = state;
         let currentTheta = this.theta;
@@ -180,22 +189,37 @@ class SpiroRenderer {
             const minWeight = state.lineWeight * (1 - state.lineThinning);
 
             // Backtrack from the head to draw the trail.
-            for (let j = 0; j < numToDraw - 1; j++) {
-                const p1_idx = (buffer.head - 1 - j + 400) % 400;
-                const p2_idx = (buffer.head - 2 - j + 400) % 400;
+            const trailSegments = numToDraw - 1;
+            const segments = Math.min(trailSegments, maxSegments);
+            let previousOffset = 0;
+            for (let segment = 1; segment <= segments; segment++) {
+                const offset = Math.round(segment * trailSegments / segments);
+                const p1_idx = (buffer.head - 1 - previousOffset + 400) % 400;
+                const p2_idx = (buffer.head - 1 - offset + 400) % 400;
+                const progress = 1 - previousOffset / trailSegments;
+                previousOffset = offset;
                 
                 const x1 = buffer.x[p1_idx];
                 const y1 = buffer.y[p1_idx];
                 const x2 = buffer.x[p2_idx];
                 const y2 = buffer.y[p2_idx];
 
-                const progress = (numToDraw - 1 - j) / (numToDraw - 1);
                 const weight = lerp(minWeight, state.lineWeight, progress);
                 strokeWeight(weight);
 
                 if (state.colorMode === "gradient") {
                     currentHue = (state.baseHue + (progress * state.colorSpread)) % 360;
                     stroke(currentHue, currentSaturation, currentBrightness, currentAlpha);
+                }
+                if (blendGlow) {
+                    // A translucent outer stroke keeps the halo without blurring
+                    // a separate shadow for every composited segment.
+                    const opacity = drawingContext.globalAlpha;
+                    drawingContext.globalAlpha = opacity * 0.16;
+                    strokeWeight(weight + 7);
+                    line(x1, y1, x2, y2);
+                    drawingContext.globalAlpha = opacity;
+                    strokeWeight(weight);
                 }
                 line(x1, y1, x2, y2);
             }
@@ -449,6 +473,7 @@ function setup() {
   const c = createCanvas(w, h);
   canvasEl = c.canvas;
   c.parent("canvas-container");
+  new ResizeObserver(syncCanvasSize).observe(canvasEl.parentElement);
   colorMode(HSB, 360, 100, 100, 100);
   frameRate(60);
   fadeAlpha = 0;
@@ -582,7 +607,8 @@ function setupEventListeners() {
 
   // Global Keyboard Shortcuts
   window.addEventListener("keydown", (e) => {
-    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName) ||
+        (e.code === "Space" && document.activeElement?.matches("button, summary, a[href]"))) return;
 
     switch (e.code) {
       case "Space":
@@ -659,13 +685,11 @@ function setupEventListeners() {
   });
 }
 
-function windowResized() {
-  // Small delay to allow flex layout to settle (especially on mobile rotation/bar toggle)
-  setTimeout(() => {
-    const { w, h } = getCanvasSize();
-    resizeCanvas(w, h);
-    renderer.clear();
-  }, 100);
+function syncCanvasSize() {
+  const { w, h } = getCanvasSize();
+  if (!renderer || !w || !h || (w === width && h === height)) return;
+  resizeCanvas(w, h);
+  renderer.clear();
 }
 
 function draw() {
@@ -1099,8 +1123,9 @@ function buildThemeGallery() {
   grid.innerHTML = "";
   const cards = [];
   window.themes.forEach(theme => {
-    const item = document.createElement("div");
+    const item = document.createElement("button");
     item.className = "gallery-item";
+    item.type = "button";
     const canvas = document.createElement("canvas");
     canvas.width = 144;
     canvas.height = 144;
@@ -1451,42 +1476,25 @@ function shuffleTheme() {
   fadeState = "fading-out";
 }
 
-function toggleFullscreenCanvas() {
+async function toggleFullscreenCanvas() {
   const container = document.getElementById("canvas-container");
-  const controls = document.getElementById("controls");
-  const button = document.getElementById("fullscreenToggle");
-
-  if (!document.fullscreenElement) {
-    container?.requestFullscreen().then(() => {
-      fullscreenMode = true;
-      if (controls) controls.style.display = "none";
-      if (button) button.innerHTML = "&#x2715;";
-      const { w, h } = getCanvasSize();
-      resizeCanvas(w, h);
-      renderer.clear();
-    });
-  } else {
-    document.exitFullscreen().then(() => {
-      fullscreenMode = false;
-      if (controls) controls.style.display = "block";
-      if (button) button.innerHTML = "&#x26F6;";
-      const { w, h } = getCanvasSize();
-      resizeCanvas(w, h);
-      renderer.clear();
-    });
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (container.requestFullscreen) {
+      await container.requestFullscreen();
+    } else {
+      showToast("Fullscreen is unavailable in this browser.");
+    }
+  } catch {
+    showToast("Fullscreen is unavailable.");
   }
 }
 
 document.addEventListener("fullscreenchange", () => {
-  const controls = document.getElementById("controls");
   const button = document.getElementById("fullscreenToggle");
-  fullscreenMode = !!document.fullscreenElement;
-  if (controls) controls.style.display = fullscreenMode ? "none" : "block";
-  if (button) {
-    button.style.display = "block";
-    button.innerHTML = fullscreenMode ? "&#x2715;" : "&#x26F6;";
-  }
-  const { w, h } = getCanvasSize();
-  resizeCanvas(w, h);
-  renderer?.clear();
+  const isFullscreen = document.fullscreenElement === button.parentElement;
+  button.textContent = isFullscreen ? "×" : "⛶";
+  button.setAttribute("aria-label", isFullscreen ? "Exit fullscreen" : "Enter fullscreen");
+  syncCanvasSize();
 });
