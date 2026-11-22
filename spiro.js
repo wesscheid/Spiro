@@ -68,6 +68,14 @@ class SpiroRenderer {
             drawingContext.shadowColor = 'transparent';
         }
 
+        // Canvas compositing and blurred shadows make each stroke more expensive.
+        // Sample the trail at render time while retaining every point in the buffer.
+        const usesEffects = state.glowEffect || drawingContext.globalCompositeOperation !== "source-over";
+        const segmentBudget = state.glowEffect ? 240 : 480;
+        const maxSegments = usesEffects
+            ? Math.max(1, Math.floor(segmentBudget / (state.numPoints * state.numLayers)))
+            : Infinity;
+
         for (let i = 0; i < state.numPoints; i++) {
             push();
             rotate((i * TWO_PI) / state.numPoints + drift);
@@ -75,7 +83,7 @@ class SpiroRenderer {
                 scale(1, -1);
             }
             for (let l = 0; l < state.numLayers; l++) {
-                this._drawCurve(i, l);
+                this._drawCurve(i, l, maxSegments);
             }
             pop();
         }
@@ -91,7 +99,7 @@ class SpiroRenderer {
         }
     }
 
-    _drawCurve(index, layer) {
+    _drawCurve(index, layer, maxSegments) {
         const { state } = this.parameterManager;
         let { outerRadius, innerRadius, centerSize } = state;
         let currentTheta = this.theta;
@@ -179,16 +187,21 @@ class SpiroRenderer {
             const minWeight = state.lineWeight * (1 - state.lineThinning);
 
             // Backtrack from the head to draw the trail.
-            for (let j = 0; j < numToDraw - 1; j++) {
-                const p1_idx = (buffer.head - 1 - j + 400) % 400;
-                const p2_idx = (buffer.head - 2 - j + 400) % 400;
+            const trailSegments = numToDraw - 1;
+            const segments = Math.min(trailSegments, maxSegments);
+            let previousOffset = 0;
+            for (let segment = 1; segment <= segments; segment++) {
+                const offset = Math.round(segment * trailSegments / segments);
+                const p1_idx = (buffer.head - 1 - previousOffset + 400) % 400;
+                const p2_idx = (buffer.head - 1 - offset + 400) % 400;
+                const progress = 1 - previousOffset / trailSegments;
+                previousOffset = offset;
                 
                 const x1 = buffer.x[p1_idx];
                 const y1 = buffer.y[p1_idx];
                 const x2 = buffer.x[p2_idx];
                 const y2 = buffer.y[p2_idx];
 
-                const progress = (numToDraw - 1 - j) / (numToDraw - 1);
                 const weight = lerp(minWeight, state.lineWeight, progress);
                 strokeWeight(weight);
 
